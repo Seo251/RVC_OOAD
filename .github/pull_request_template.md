@@ -1,7 +1,8 @@
 ## Jira
 
-- Jira issue key: `RVC-000`
+- Jira issue key: `RVC-REQ-000`
 - Jira link:
+- Branch example: `feature/RVC-REQ-000-short-description`
 
 ## Summary
 
