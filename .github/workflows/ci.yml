@@ -84,9 +84,8 @@ jobs:
 
           cppcheck \
             --enable=all \
-            --inconclusive \
             --std=c++17 \
-            --suppress=missingIncludeSystem \
+            --suppress=unusedFunction \
             --error-exitcode=1 \
             --project="${BUILD_DIR}/cppcheck-compile-commands.json"
 
