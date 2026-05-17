@@ -1,0 +1,24 @@
+@startuml
+title SSD - Start and Stop Cleaning
+
+actor User
+participant "rvc_controller" as Controller
+participant "Front Sensor" as FrontSensor
+participant Motor
+participant Cleaner
+
+== Start from power off ==
+User -> Controller: pressPowerButton()
+Controller -> Controller: setPowerState(On)
+Controller -> FrontSensor: isObstacleDetected()
+FrontSensor --> Controller: false
+Controller -> Motor: forward()
+Controller -> Cleaner: turnOn()
+
+== Stop while power on ==
+User -> Controller: pressPowerButton()
+Controller -> Controller: cancelActiveProcess()
+Controller -> Motor: stop()
+Controller -> Cleaner: turnOff()
+Controller -> Controller: setPowerState(Off)
+@enduml

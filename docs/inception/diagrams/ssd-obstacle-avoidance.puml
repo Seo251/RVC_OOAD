@@ -1,0 +1,43 @@
+@startuml
+title SSD - Obstacle Avoidance
+
+actor "Front Sensor" as FrontSensor
+participant "rvc_controller" as Controller
+participant "Left Sensor" as LeftSensor
+participant "Right Sensor" as RightSensor
+participant Motor
+participant Cleaner
+
+FrontSensor -> Controller: frontObstacleDetected()
+Controller -> Cleaner: turnOff()
+Controller -> LeftSensor: isObstacleDetected()
+
+alt left side is clear
+  LeftSensor --> Controller: false
+  Controller -> Motor: turnLeft()
+else left side is blocked
+  LeftSensor --> Controller: true
+  Controller -> RightSensor: isObstacleDetected()
+  alt right side is clear
+    RightSensor --> Controller: false
+    Controller -> Motor: turnRight()
+  else both sides are blocked
+    RightSensor --> Controller: true
+    loop until left or right side is clear
+      Controller -> Motor: backward()
+      Controller -> LeftSensor: isObstacleDetected()
+      LeftSensor --> Controller: leftBlocked
+      Controller -> RightSensor: isObstacleDetected()
+      RightSensor --> Controller: rightBlocked
+    end
+    alt left side becomes clear
+      Controller -> Motor: turnLeft()
+    else right side becomes clear
+      Controller -> Motor: turnRight()
+    end
+  end
+end
+
+Controller -> Motor: forward()
+Controller -> Cleaner: turnOn()
+@enduml

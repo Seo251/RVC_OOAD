@@ -1,0 +1,23 @@
+@startuml
+title SSD - Dust Power-Up Cleaning
+
+actor "Dust Sensor" as DustSensor
+actor "Front Sensor" as FrontSensor
+participant "rvc_controller" as Controller
+participant Cleaner
+participant Timer
+
+DustSensor -> Controller: dustDetected()
+Controller -> Cleaner: powerUp()
+Controller -> Timer: start(5 seconds)
+
+alt no front obstacle during 5 seconds
+  Timer --> Controller: timeout()
+  Controller -> Cleaner: turnOn()
+else front obstacle detected before timeout
+  FrontSensor -> Controller: frontObstacleDetected()
+  Controller -> Timer: cancel()
+  Controller -> Cleaner: turnOff()
+  Controller -> Controller: startObstacleAvoidance()
+end
+@enduml

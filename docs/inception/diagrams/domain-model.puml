@@ -1,0 +1,106 @@
+@startuml
+title Domain Model - RVC Controller Inception
+
+skinparam classAttributeIconSize 0
+
+class User
+
+class RvcController {
+  powerState
+  cleaningState
+  handlePowerButton()
+  handleSensorInput()
+}
+
+class SensorArray {
+  readFront()
+  readLeft()
+  readRight()
+  readDust()
+}
+
+class FrontSensor
+class LeftSensor
+class RightSensor
+class DustSensor
+
+class SensorReading {
+  frontObstacle
+  leftObstacle
+  rightObstacle
+  dustDetected
+}
+
+class ObstacleAvoidancePolicy {
+  selectDirection(reading)
+}
+
+class Motor {
+  moveForward()
+  moveBackward()
+  turnLeft()
+  turnRight()
+  stop()
+}
+
+class Cleaner {
+  turnOn()
+  turnOff()
+  powerUp()
+}
+
+class PowerUpTimer {
+  start(duration)
+  cancel()
+  timeout()
+}
+
+class ControlCommand {
+  direction
+  clean
+}
+
+enum PowerState {
+  Off
+  On
+}
+
+enum CleaningState {
+  Idle
+  Cleaning
+  AvoidingObstacle
+  PowerUpCleaning
+}
+
+enum DirectionCommand {
+  Stop
+  Forward
+  Backward
+  Left
+  Right
+}
+
+enum CleanCommand {
+  Off
+  On
+  PowerUp
+}
+
+User --> RvcController : presses button
+RvcController --> SensorArray : reads
+SensorArray o-- FrontSensor
+SensorArray o-- LeftSensor
+SensorArray o-- RightSensor
+SensorArray o-- DustSensor
+SensorArray --> SensorReading : produces
+RvcController --> ObstacleAvoidancePolicy : uses
+ObstacleAvoidancePolicy --> SensorReading : evaluates
+RvcController --> Motor : commands
+RvcController --> Cleaner : commands
+RvcController --> PowerUpTimer : controls
+RvcController --> ControlCommand : creates
+RvcController --> PowerState
+RvcController --> CleaningState
+ControlCommand --> DirectionCommand
+ControlCommand --> CleanCommand
+@enduml

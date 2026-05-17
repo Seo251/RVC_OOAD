@@ -1,0 +1,40 @@
+@startuml
+left to right direction
+skinparam packageStyle rectangle
+
+actor User
+actor "Front Sensor" as FrontSensor
+actor "Left Sensor" as LeftSensor
+actor "Right Sensor" as RightSensor
+actor "Dust Sensor" as DustSensor
+actor Timer
+
+rectangle "rvc_controller" {
+  usecase "Start Cleaning" as UC_Start
+  usecase "Stop Cleaning" as UC_Stop
+  usecase "Check Front Obstacle" as UC_CheckFront
+  usecase "Avoid Obstacle" as UC_Avoid
+  usecase "Turn Left" as UC_TurnLeft
+  usecase "Turn Right" as UC_TurnRight
+  usecase "Move Backward Until Clear" as UC_Backward
+  usecase "Power Up Cleaning For 5 Seconds" as UC_Dust
+  usecase "Restore Normal Cleaning Power" as UC_Restore
+}
+
+User --> UC_Start
+User --> UC_Stop
+FrontSensor --> UC_CheckFront
+FrontSensor --> UC_Avoid
+LeftSensor --> UC_Avoid
+RightSensor --> UC_Avoid
+DustSensor --> UC_Dust
+Timer --> UC_Restore
+
+UC_Start .> UC_CheckFront : <<include>>
+UC_CheckFront .> UC_Avoid : <<extend>>
+UC_Avoid .> UC_TurnLeft : <<extend>>
+UC_Avoid .> UC_TurnRight : <<extend>>
+UC_Avoid .> UC_Backward : <<extend>>
+UC_Dust .> UC_Restore : <<include>>
+UC_Dust .> UC_Avoid : <<extend>>
+@enduml
