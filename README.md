@@ -76,6 +76,42 @@ The simulator uses left-click to toggle obstacles and right-click to toggle
 dust. It communicates with the C++ controller through line-delimited JSON over
 TCP.
 
+Simulator controls:
+
+- `Connect`: connect to the C++ controller app.
+- Left-click a cell: toggle an obstacle.
+- Right-click a cell: toggle dust.
+- `Power Button`: send the power button event. When the controller enters
+  `CheckingFront`, the simulator automatically checks the front cell in the map
+  and sends either `Front Clear` or `Front Obstacle`.
+- `Front From Map`: manually re-check the current front cell from the map.
+- `Front Clear`: tell the controller that the front cell is clear.
+- `Front Obstacle`: tell the controller that the front cell is blocked.
+- `Left Clear`: send a side-sensor update where the left side is clear.
+- `Right Clear`: send a side-sensor update where the right side is clear.
+- `Both Blocked`: send a side-sensor update where both sides are blocked.
+- `Dust Detected`: send a dust detection event.
+- `Timer Expired`: simulate the 5-second cleaner power-up timer expiring.
+- `Motion Done`: tell the controller that the current turn/backward motion
+  completed.
+- `Save Map` / `Load Map`: save or load manually edited obstacle/dust maps.
+
+The robot is drawn as a blue circle. The white arrow inside the robot shows the
+current front direction. Controller motion events update the simulator pose:
+`Forward` moves one cell forward, `Backward` moves one cell backward, and
+`TurnLeft`/`TurnRight` rotate the arrow.
+
+Basic manual scenario:
+
+```text
+1. Start rvc_controller_app.exe 5050.
+2. Start simulator_ui.py.
+3. Click Connect.
+4. Place or remove obstacles/dust on the grid.
+5. Click Power Button.
+6. Use Motion Done after a turn/backward command to finish the motion.
+```
+
 ## Testing
 
 Run unit tests:
