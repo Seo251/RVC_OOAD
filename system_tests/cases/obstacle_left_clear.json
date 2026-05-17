@@ -1,0 +1,16 @@
+{
+  "name": "front obstacle with left clear",
+  "map": "../maps/straight_cleaning.json",
+  "steps": [
+    {"op": "pressPowerButton"},
+    {"op": "frontObstacleDetected"},
+    {"op": "sideSensorUpdated", "leftBlocked": false, "rightBlocked": true},
+    {"op": "motionCompleted", "motion": "TurnLeft"}
+  ],
+  "expected": {
+    "powerState": "On",
+    "cleaningState": "CleaningForward",
+    "lastMotion": "Forward",
+    "lastCleaner": "On"
+  }
+}

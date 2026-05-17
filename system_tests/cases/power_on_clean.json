@@ -1,0 +1,14 @@
+{
+  "name": "power on and clean straight",
+  "map": "../maps/straight_cleaning.json",
+  "steps": [
+    {"op": "pressPowerButton"},
+    {"op": "frontPathClear"}
+  ],
+  "expected": {
+    "powerState": "On",
+    "cleaningState": "CleaningForward",
+    "lastMotion": "Forward",
+    "lastCleaner": "On"
+  }
+}

@@ -100,7 +100,7 @@ jobs:
           compile_commands = pathlib.Path("build/compile_commands.json")
           repo_root = pathlib.Path.cwd().resolve()
           commands = json.loads(compile_commands.read_text(encoding="utf-8"))
-          allowed_dirs = {"src", "tests"}
+          allowed_dirs = {"src", "apps", "tests"}
           sources = []
 
           for entry in commands:

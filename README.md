@@ -51,6 +51,48 @@ workspace.
 The CI job generates `build/compile_commands.json` for C++ analysis and
 `coverage/sonarqube.xml` for coverage import.
 
+## Running the Controller and Simulator
+
+Build the C++ controller app:
+
+```powershell
+cmake -S . -B build -DCMAKE_BUILD_TYPE=Debug -DCMAKE_EXPORT_COMPILE_COMMANDS=ON
+cmake --build build
+```
+
+Start the TCP bridge:
+
+```powershell
+.\build\Debug\rvc_controller_app.exe 5050
+```
+
+In another terminal, start the Python UI simulator:
+
+```powershell
+python simulator\simulator_ui.py
+```
+
+The simulator uses left-click to toggle obstacles and right-click to toggle
+dust. It communicates with the C++ controller through line-delimited JSON over
+TCP.
+
+## Testing
+
+Run unit tests:
+
+```powershell
+ctest --test-dir build --output-on-failure
+```
+
+Run system tests after starting the controller app:
+
+```powershell
+python system_tests\run_system_tests.py --port 5050
+```
+
+Unit tests target the C++ controller/core only. The Python simulator is excluded
+from unit coverage.
+
 ## Jira FR Management
 
 Jira is the source of truth for feature requests. GitHub issues and pull

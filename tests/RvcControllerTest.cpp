@@ -1,64 +1,220 @@
 #include "rvc/RvcController.h"
 
+#include "FakePorts.h"
+
 #include <gtest/gtest.h>
+
+#include <vector>
 
 namespace rvc {
 namespace {
 
-TEST(RvcControllerTest, GoesForwardAndCleansByDefault) {
-  const RvcController controller;
+using test::ControllerFixture;
 
-  const ControlCommand command = controller.Update(SensorInput{});
+TEST(RvcControllerTest, StartsByRequestingFrontCheck) {
+  ControllerFixture fixture;
 
-  EXPECT_EQ(command.direction, DirectionCommand::Forward);
-  EXPECT_EQ(command.clean, CleanCommand::On);
+  fixture.controller.PressPowerButton();
+
+  const ControllerSnapshot snapshot = fixture.controller.Snapshot();
+  EXPECT_EQ(snapshot.power_state, PowerState::On);
+  EXPECT_EQ(snapshot.cleaning_state, CleaningState::CheckingFront);
+  EXPECT_EQ(fixture.log.calls, std::vector<std::string>{"front.request"});
 }
 
-TEST(RvcControllerTest, PowersUpCleaningWhenDustIsDetected) {
-  const RvcController controller;
+TEST(RvcControllerTest, StartsForwardCleaningWhenFrontPathIsClear) {
+  ControllerFixture fixture;
+
+  fixture.controller.PressPowerButton();
+  fixture.controller.FrontPathClear();
+
+  const ControllerSnapshot snapshot = fixture.controller.Snapshot();
+  EXPECT_EQ(snapshot.cleaning_state, CleaningState::CleaningForward);
+  EXPECT_EQ(snapshot.last_motion, MotionCommand::Forward);
+  EXPECT_EQ(snapshot.last_cleaner, CleanerCommand::On);
+  EXPECT_EQ(fixture.log.calls,
+            (std::vector<std::string>{"front.request", "motor.forward",
+                                      "cleaner.on"}));
+}
+
+TEST(RvcControllerTest, PowerButtonStopsEverythingWhenPoweredOn) {
+  ControllerFixture fixture;
+
+  fixture.controller.PressPowerButton();
+  fixture.controller.FrontPathClear();
+  fixture.log.calls.clear();
+
+  fixture.controller.PressPowerButton();
+
+  const ControllerSnapshot snapshot = fixture.controller.Snapshot();
+  EXPECT_EQ(snapshot.power_state, PowerState::Off);
+  EXPECT_EQ(snapshot.cleaning_state, CleaningState::PoweredOff);
+  EXPECT_EQ(snapshot.last_motion, MotionCommand::Stop);
+  EXPECT_EQ(snapshot.last_cleaner, CleanerCommand::Off);
+  EXPECT_EQ(fixture.log.calls,
+            (std::vector<std::string>{"timer.cancel", "motor.stop",
+                                      "cleaner.off"}));
+}
+
+TEST(RvcControllerTest, FrontObstacleInterruptsPowerUpAndRequestsSideCheck) {
+  ControllerFixture fixture;
+  fixture.controller.PressPowerButton();
+  fixture.controller.FrontPathClear();
+  fixture.controller.DustDetected();
+  fixture.log.calls.clear();
+
+  fixture.controller.FrontObstacleDetected();
+
+  const ControllerSnapshot snapshot = fixture.controller.Snapshot();
+  EXPECT_EQ(snapshot.cleaning_state, CleaningState::AvoidingObstacle);
+  EXPECT_EQ(snapshot.last_cleaner, CleanerCommand::Off);
+  EXPECT_EQ(fixture.log.calls,
+            (std::vector<std::string>{"timer.cancel", "cleaner.off",
+                                      "side.request"}));
+}
+
+TEST(RvcControllerTest, AvoidanceTurnsLeftWhenLeftIsClear) {
+  ControllerFixture fixture;
+  fixture.controller.PressPowerButton();
+  fixture.controller.FrontObstacleDetected();
+  fixture.log.calls.clear();
+
+  fixture.controller.SideSensorUpdated(false, true);
+
+  EXPECT_EQ(fixture.controller.Snapshot().last_motion, MotionCommand::TurnLeft);
+  EXPECT_EQ(fixture.log.calls, std::vector<std::string>{"motor.turnLeft"});
+}
+
+TEST(RvcControllerTest, AvoidanceTurnsRightWhenLeftBlockedAndRightClear) {
+  ControllerFixture fixture;
+  fixture.controller.PressPowerButton();
+  fixture.controller.FrontObstacleDetected();
+  fixture.log.calls.clear();
+
+  fixture.controller.SideSensorUpdated(true, false);
+
+  EXPECT_EQ(fixture.controller.Snapshot().last_motion, MotionCommand::TurnRight);
+  EXPECT_EQ(fixture.log.calls, std::vector<std::string>{"motor.turnRight"});
+}
+
+TEST(RvcControllerTest, AvoidanceMovesBackwardWhenBothSidesBlocked) {
+  ControllerFixture fixture;
+  fixture.controller.PressPowerButton();
+  fixture.controller.FrontObstacleDetected();
+  fixture.log.calls.clear();
+
+  fixture.controller.SideSensorUpdated(true, true);
+
+  EXPECT_EQ(fixture.controller.Snapshot().last_motion, MotionCommand::Backward);
+  EXPECT_EQ(fixture.log.calls, std::vector<std::string>{"motor.backward"});
+}
+
+TEST(RvcControllerTest, BackwardCompletionRequestsSideCheckAgain) {
+  ControllerFixture fixture;
+  fixture.controller.PressPowerButton();
+  fixture.controller.FrontObstacleDetected();
+  fixture.log.calls.clear();
+
+  fixture.controller.MotionCompleted(MotionCommand::Backward);
+
+  EXPECT_EQ(fixture.log.calls, std::vector<std::string>{"side.request"});
+}
+
+TEST(RvcControllerTest, TurnCompletionResumesForwardCleaning) {
+  ControllerFixture fixture;
+  fixture.controller.PressPowerButton();
+  fixture.controller.FrontObstacleDetected();
+  fixture.log.calls.clear();
+
+  fixture.controller.MotionCompleted(MotionCommand::TurnLeft);
+
+  const ControllerSnapshot snapshot = fixture.controller.Snapshot();
+  EXPECT_EQ(snapshot.cleaning_state, CleaningState::CleaningForward);
+  EXPECT_EQ(snapshot.last_motion, MotionCommand::Forward);
+  EXPECT_EQ(snapshot.last_cleaner, CleanerCommand::On);
+  EXPECT_EQ(fixture.log.calls,
+            (std::vector<std::string>{"motor.forward", "cleaner.on"}));
+}
+
+TEST(RvcControllerTest, DustPowerUpStartsTimerDuringForwardCleaning) {
+  ControllerFixture fixture;
+  fixture.controller.PressPowerButton();
+  fixture.controller.FrontPathClear();
+  fixture.log.calls.clear();
+
+  fixture.controller.DustDetected();
+
+  const ControllerSnapshot snapshot = fixture.controller.Snapshot();
+  EXPECT_EQ(snapshot.cleaning_state, CleaningState::PowerUpCleaning);
+  EXPECT_EQ(snapshot.last_cleaner, CleanerCommand::PowerUp);
+  EXPECT_EQ(fixture.log.calls,
+            (std::vector<std::string>{"cleaner.powerUp", "timer.start:5"}));
+}
+
+TEST(RvcControllerTest, DuplicateDustRestartsTimer) {
+  ControllerFixture fixture;
+  fixture.controller.PressPowerButton();
+  fixture.controller.FrontPathClear();
+  fixture.controller.DustDetected();
+  fixture.log.calls.clear();
+
+  fixture.controller.DustDetected();
+
+  EXPECT_EQ(fixture.log.calls,
+            (std::vector<std::string>{"timer.restart:5", "cleaner.powerUp"}));
+}
+
+TEST(RvcControllerTest, DustIsIgnoredDuringAvoidance) {
+  ControllerFixture fixture;
+  fixture.controller.PressPowerButton();
+  fixture.controller.FrontObstacleDetected();
+  fixture.log.calls.clear();
+
+  fixture.controller.DustDetected();
+
+  EXPECT_EQ(fixture.controller.Snapshot().cleaning_state,
+            CleaningState::AvoidingObstacle);
+  EXPECT_TRUE(fixture.log.calls.empty());
+}
+
+TEST(RvcControllerTest, TimerExpiryRestoresNormalCleaning) {
+  ControllerFixture fixture;
+  fixture.controller.PressPowerButton();
+  fixture.controller.FrontPathClear();
+  fixture.controller.DustDetected();
+  fixture.log.calls.clear();
+
+  fixture.controller.PowerUpTimerExpired();
+
+  const ControllerSnapshot snapshot = fixture.controller.Snapshot();
+  EXPECT_EQ(snapshot.cleaning_state, CleaningState::CleaningForward);
+  EXPECT_EQ(snapshot.last_cleaner, CleanerCommand::On);
+  EXPECT_EQ(fixture.log.calls, std::vector<std::string>{"cleaner.on"});
+}
+
+TEST(RvcControllerTest, EventsAreIgnoredWhenPoweredOff) {
+  ControllerFixture fixture;
+
+  fixture.controller.FrontObstacleDetected();
+  fixture.controller.FrontPathClear();
+  fixture.controller.DustDetected();
+  fixture.controller.PowerUpTimerExpired();
+
+  EXPECT_EQ(fixture.controller.Snapshot().power_state, PowerState::Off);
+  EXPECT_TRUE(fixture.log.calls.empty());
+}
+
+TEST(RvcControllerTest, CompatibilityUpdateStillMapsSensorInput) {
+  ControllerFixture fixture;
   SensorInput input;
+  input.front_obstacle = true;
+  input.left_obstacle = true;
   input.dust_detected = true;
 
-  const ControlCommand command = controller.Update(input);
+  const ControlCommand command = fixture.controller.Update(input);
 
-  EXPECT_EQ(command.direction, DirectionCommand::Forward);
-  EXPECT_EQ(command.clean, CleanCommand::PowerUp);
-}
-
-TEST(RvcControllerTest, TurnsLeftWhenFrontIsBlockedAndLeftIsClear) {
-  const RvcController controller;
-  SensorInput input;
-  input.front_obstacle = true;
-
-  const ControlCommand command = controller.Update(input);
-
-  EXPECT_EQ(command.direction, DirectionCommand::Left);
-  EXPECT_EQ(command.clean, CleanCommand::On);
-}
-
-TEST(RvcControllerTest, TurnsRightWhenFrontAndLeftAreBlocked) {
-  const RvcController controller;
-  SensorInput input;
-  input.front_obstacle = true;
-  input.left_obstacle = true;
-
-  const ControlCommand command = controller.Update(input);
-
-  EXPECT_EQ(command.direction, DirectionCommand::Right);
-  EXPECT_EQ(command.clean, CleanCommand::On);
-}
-
-TEST(RvcControllerTest, MovesBackwardWhenFrontLeftAndRightAreBlocked) {
-  const RvcController controller;
-  SensorInput input;
-  input.front_obstacle = true;
-  input.left_obstacle = true;
-  input.right_obstacle = true;
-
-  const ControlCommand command = controller.Update(input);
-
-  EXPECT_EQ(command.direction, DirectionCommand::Backward);
-  EXPECT_EQ(command.clean, CleanCommand::On);
+  EXPECT_EQ(command.motion, MotionCommand::TurnRight);
+  EXPECT_EQ(command.cleaner, CleanerCommand::PowerUp);
 }
 
 }  // namespace

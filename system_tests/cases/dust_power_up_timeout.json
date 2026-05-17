@@ -1,0 +1,16 @@
+{
+  "name": "dust power-up timeout",
+  "map": "../maps/dust_path.json",
+  "steps": [
+    {"op": "pressPowerButton"},
+    {"op": "frontPathClear"},
+    {"op": "dustDetected"},
+    {"op": "powerUpTimerExpired"}
+  ],
+  "expected": {
+    "powerState": "On",
+    "cleaningState": "CleaningForward",
+    "lastMotion": "Forward",
+    "lastCleaner": "On"
+  }
+}

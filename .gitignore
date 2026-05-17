@@ -15,6 +15,10 @@ CMakeFiles/
 compile_commands.json
 Testing/
 
+# Python generated files
+__pycache__/
+*.pyc
+
 # Editor and OS metadata
 .vscode/
 *.user

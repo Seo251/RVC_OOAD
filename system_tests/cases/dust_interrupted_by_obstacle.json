@@ -1,0 +1,16 @@
+{
+  "name": "dust power-up interrupted by obstacle",
+  "map": "../maps/dust_path.json",
+  "steps": [
+    {"op": "pressPowerButton"},
+    {"op": "frontPathClear"},
+    {"op": "dustDetected"},
+    {"op": "frontObstacleDetected"}
+  ],
+  "expected": {
+    "powerState": "On",
+    "cleaningState": "AvoidingObstacle",
+    "lastMotion": "Forward",
+    "lastCleaner": "Off"
+  }
+}
