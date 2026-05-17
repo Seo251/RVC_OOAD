@@ -4,7 +4,7 @@ namespace rvc {
 
 namespace {
 
-constexpr int kPowerUpDurationSeconds = 5;
+constexpr int kPowerUpDurationSeconds = 3;
 
 }  // namespace
 
@@ -81,6 +81,12 @@ void RvcController::FrontObstacleDetected() {
 
 void RvcController::FrontPathClear() {
   if (state_.IsPoweredOff()) {
+    return;
+  }
+
+  if (state_.CurrentCleaningState() == CleaningState::PowerUpCleaning) {
+    motor_.Forward();
+    SetLastMotion(MotionCommand::Forward);
     return;
   }
 

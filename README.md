@@ -100,7 +100,7 @@ obstacles and dust will affect the next sensor check.
 - `Front Clear` / `Front Obstacle`: manual sensor overrides for debugging.
 - `Left Clear` / `Right Clear` / `Both Blocked`: manual side-sensor overrides.
 - `Dust Detected`: manually inject a dust detection event.
-- `Timer Expired`: manually fire the 5-second cleaner power-up timer.
+- `Timer Expired`: manually fire the 3-second cleaner power-up timer.
 - `Motion Done`: manually confirm the current turn/backward motion.
 - `Save Map` / `Load Map`: save or load obstacle/dust maps.
 

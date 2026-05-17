@@ -9,11 +9,20 @@ participant Timer
 
 DustSensor -> Controller: dustDetected()
 Controller -> Cleaner: powerUp()
-Controller -> Timer: start(5 seconds)
+Controller -> Timer: start(3 seconds)
+note right of Controller
+  Motor keeps Forward.
+  The robot keeps moving while
+  power-up cleaning is active.
+end note
 
-alt no front obstacle during 5 seconds
+alt no event during 3 seconds
   Timer --> Controller: timeout()
   Controller -> Cleaner: turnOn()
+else dust detected again during power-up
+  DustSensor -> Controller: dustDetected()
+  Controller -> Timer: discard previous and start(3 seconds)
+  Controller -> Cleaner: powerUp()
 else front obstacle detected before timeout
   FrontSensor -> Controller: frontObstacleDetected()
   Controller -> Timer: cancel()

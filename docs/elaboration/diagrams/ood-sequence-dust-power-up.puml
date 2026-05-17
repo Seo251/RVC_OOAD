@@ -15,14 +15,29 @@ DustSensor -> Controller: dustDetected()
 Controller -> State: currentCleaningState()
 State --> Controller: CleaningForward
 Controller -> Cleaner: powerUp()
-Controller -> Timer: start(5 seconds)
+Controller -> Timer: start(3 seconds)
 Controller -> State: setCleaningState(PowerUpCleaning)
+note right of Controller
+  Motor stays at Forward.
+  Subsequent frontPathClear()
+  events keep issuing motor.forward()
+  while staying in PowerUpCleaning.
+end note
+
+== Forward step continues during power-up ==
+FrontSensor -> Controller: frontPathClear()
+Controller -> State: currentCleaningState()
+State --> Controller: PowerUpCleaning
+Controller -> Motor: forward()
+note right of Controller
+  Cleaner and timer are NOT touched.
+end note
 
 == Dust detected again during power-up ==
 DustSensor -> Controller: dustDetected()
 Controller -> State: currentCleaningState()
 State --> Controller: PowerUpCleaning
-Controller -> Timer: restart(5 seconds)
+Controller -> Timer: restart(3 seconds)
 Controller -> Cleaner: powerUp()
 
 alt timer expires without obstacle

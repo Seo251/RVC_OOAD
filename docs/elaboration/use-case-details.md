@@ -11,9 +11,10 @@
 | 1 | `pressPowerButton()` while powered on | 모든 진행 상태를 취소하고 motor stop, cleaner off, timer cancel 후 `PoweredOff`로 전이한다. |
 | 2 | `frontObstacleDetected()` | 청소 또는 power-up 상태보다 우선한다. 즉시 cleaner off, timer cancel 후 장애물 회피로 전이한다. |
 | 3 | `dustDetected()` while avoiding obstacle | 회피, 회전, 후진 중에는 무시한다. cleaner는 off 상태를 유지한다. |
-| 4 | `dustDetected()` while power-up already active | 기존 5초 타이머를 reset/restart한다. 누적 시간은 저장하지 않는다. |
-| 5 | `powerUpTimerExpired()` | 현재 상태가 `PowerUpCleaning`일 때만 cleaner를 normal on으로 복귀한다. |
-| 6 | obstacle avoidance completed | 회피가 끝난 뒤에만 motor forward, cleaner on으로 복귀한다. |
+| 4 | `dustDetected()` while power-up already active | 기존 3초 타이머를 폐기하고 그 시점부터 새 3초 타이머를 시작한다. 누적 시간은 저장하지 않는다. Motor는 `Forward`, Cleaner는 `PowerUp` 상태를 유지한다 (FR-021). |
+| 5 | `powerUpTimerExpired()` | 현재 상태가 `PowerUpCleaning`일 때만 cleaner를 normal on으로 복귀하고, motor는 `Forward`로 유지하며 `CleaningForward`로 전이한다. |
+| 6 | `frontPathClear()` while `PowerUpCleaning` | power-up 청소 상태와 cleaner power-up을 유지하면서 motor에 `Forward` 명령을 다시 보내 다음 한 스텝을 진행한다. |
+| 7 | obstacle avoidance completed | 회피가 끝난 뒤에만 motor forward, cleaner on으로 복귀한다. |
 
 ## Controller States
 
@@ -22,7 +23,7 @@
 | `PoweredOff` | 전원이 꺼진 상태 | Stop | Off |
 | `CheckingFront` | 전원 켜짐 직후 또는 회피 종료 후 전방 확인 | Stop 또는 이전 안전 상태 | Off |
 | `CleaningForward` | 전방 장애물이 없고 전진 청소 중 | Forward | On |
-| `PowerUpCleaning` | 전진 중 먼지 감지로 5초 power-up 중 | Forward | PowerUp |
+| `PowerUpCleaning` | 전진을 유지한 상태로 3초 동안 cleaner power-up 중 | Forward | PowerUp |
 | `AvoidingObstacle` | 장애물 회피 판단 및 회피 동작 중 | Left, Right, 또는 Backward | Off |
 
 ## System Operations
@@ -36,8 +37,8 @@
 | `frontPathClear()` | Front Sensor | 전원 on 또는 회피 종료 후 전방이 비어 있음을 알린다. | FR-004, FR-005, FR-014, UC-001 |
 | `sideSensorUpdated(leftBlocked, rightBlocked)` | Side Sensors | 회피 중 좌/우 장애물 상태를 controller에 전달한다. | FR-008, FR-009, FR-010, FR-011, FR-012, FR-013 |
 | `motionCompleted(motion)` | Motor | 회전 또는 후진 step 완료를 알린다. 하드웨어 세부 구현은 제외한다. | FR-013, FR-014 |
-| `dustDetected()` | Dust Sensor | 전진 청소 중 먼지 감지를 전달한다. | FR-015, FR-017, UC-004 |
-| `powerUpTimerExpired()` | Timer | 5초 power-up 시간이 지났음을 전달한다. | FR-016, UC-004 |
+| `dustDetected()` | Dust Sensor | 전진 청소 중 먼지 감지를 전달한다. | FR-015, FR-017, FR-021, UC-004 |
+| `powerUpTimerExpired()` | Timer | 3초 power-up 시간이 지났음을 전달한다. | FR-016, UC-004 |
 
 ## Operation Contracts
 
@@ -82,8 +83,8 @@
 | Field | Contract |
 | --- | --- |
 | Preconditions | `powerState=On` |
-| Postconditions in `CleaningForward` | cleaner power-up, 5-second timer started, `state=PowerUpCleaning` |
-| Postconditions in `PowerUpCleaning` | 5-second timer reset/restarted, cleaner remains power-up |
+| Postconditions in `CleaningForward` | cleaner power-up, 3-second timer started, `state=PowerUpCleaning`, motor stays `Forward` |
+| Postconditions in `PowerUpCleaning` | previous 3-second timer discarded and a new 3-second timer started from this moment, cleaner remains power-up, motor stays `Forward` |
 | Ignored when | `PoweredOff`, `CheckingFront`, or `AvoidingObstacle` |
 
 ### `powerUpTimerExpired()`
@@ -91,8 +92,17 @@
 | Field | Contract |
 | --- | --- |
 | Preconditions | timer event was created by power-up flow |
-| Postconditions in `PowerUpCleaning` | cleaner on, `state=CleaningForward` |
+| Postconditions in `PowerUpCleaning` | cleaner on, `state=CleaningForward`, motor stays `Forward` (the next forward step is requested through the normal `frontPathClear()` cycle) |
 | Ignored when | current state is not `PowerUpCleaning` |
+
+### `frontPathClear()`
+
+| Field | Contract |
+| --- | --- |
+| Preconditions | `powerState=On` |
+| Postconditions in `CheckingFront` / `CleaningForward` / `AvoidingObstacle` | enter `CleaningForward`, motor forward, cleaner on |
+| Postconditions in `PowerUpCleaning` | stay in `PowerUpCleaning`, motor forward (no cleaner or timer change) |
+| Ignored when | `powerState=Off` |
 
 ## Refined Use Cases
 
@@ -130,8 +140,8 @@
 | Field | Detail |
 | --- | --- |
 | Trigger | `dustDetected()` while `CleaningForward`. |
-| Main Flow | Controller sets cleaner to power-up, starts 5-second timer, then returns cleaner to normal on when timer expires. |
-| Alternative | Dust detected again while already power-up: reset/restart the 5-second timer. |
+| Main Flow | Controller sets cleaner to power-up, starts a 3-second timer, keeps motor at `Forward`, and returns cleaner to normal on when the timer expires while keeping motor moving forward. |
+| Alternative | Dust detected again while already in `PowerUpCleaning`: discard the previous timer and start a new 3-second timer from that moment. State and cleaner power-up are kept; motor keeps moving forward. |
 | Exception | Front obstacle detected during power-up: cancel timer, turn cleaner off, enter obstacle avoidance. Existing power-up elapsed time is discarded. |
 | Exception | Dust detected while turning/backward/avoiding: ignored because cleaner must remain off during avoidance. |
 
@@ -145,8 +155,9 @@
 | FR-008, FR-009, FR-010, FR-011 | `sideSensorUpdated()` applies left-first avoidance policy. |
 | FR-012, FR-013 | both sides blocked leads to repeated backward motion until a side is clear. |
 | FR-014 | `motionCompleted(turn)` resumes forward cleaning. |
-| FR-015, FR-016 | `dustDetected()` and `powerUpTimerExpired()` model 5-second power-up. |
+| FR-015, FR-016 | `dustDetected()` and `powerUpTimerExpired()` model a 3-second power-up while motor keeps moving forward. |
 | FR-017 | obstacle during power-up cancels timer and starts avoidance. |
+| FR-021 | repeated `dustDetected()` during `PowerUpCleaning` discards the previous 3-second timer and restarts from the new dust moment without leaving the state. |
 | FR-018, FR-019 | motor and cleaner outputs are modeled through actuator ports and command enums. |
 | FR-020 | controller accepts user, sensor, timer, and motion completion operations. |
 
@@ -159,3 +170,4 @@
 | Backward-until-clear needs an event that tells the controller when to re-check sides. | Use `motionCompleted(Backward)` followed by `sideSensorUpdated(leftBlocked, rightBlocked)`. |
 | Turn completion is not specified at hardware level. | Abstract it as `motionCompleted(Left/Right)` without defining motor angle or duration. |
 | Dust detected during avoidance was not explicitly prioritized. | It is ignored during `AvoidingObstacle`; cleaner remains off. |
+| Original FR-015/016 said only "5 seconds power-up" and did not say what motor does, leaving the impression that the robot might stop. | FR-015/016/021 now require motor to stay `Forward` during `PowerUpCleaning`. `frontPathClear()` while `PowerUpCleaning` issues another `motor.forward()` without touching cleaner or state, so the controller still progresses one step at a time but the cleaning state and timer are not disrupted. |

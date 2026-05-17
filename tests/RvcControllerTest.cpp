@@ -136,7 +136,7 @@ TEST(RvcControllerTest, TurnCompletionResumesForwardCleaning) {
             (std::vector<std::string>{"motor.forward", "cleaner.on"}));
 }
 
-TEST(RvcControllerTest, DustPowerUpStartsTimerDuringForwardCleaning) {
+TEST(RvcControllerTest, DustPowerUpStartsThreeSecondTimerDuringForwardCleaning) {
   ControllerFixture fixture;
   fixture.controller.PressPowerButton();
   fixture.controller.FrontPathClear();
@@ -147,11 +147,12 @@ TEST(RvcControllerTest, DustPowerUpStartsTimerDuringForwardCleaning) {
   const ControllerSnapshot snapshot = fixture.controller.Snapshot();
   EXPECT_EQ(snapshot.cleaning_state, CleaningState::PowerUpCleaning);
   EXPECT_EQ(snapshot.last_cleaner, CleanerCommand::PowerUp);
+  EXPECT_EQ(snapshot.last_motion, MotionCommand::Forward);
   EXPECT_EQ(fixture.log.calls,
-            (std::vector<std::string>{"cleaner.powerUp", "timer.start:5"}));
+            (std::vector<std::string>{"cleaner.powerUp", "timer.start:3"}));
 }
 
-TEST(RvcControllerTest, DuplicateDustRestartsTimer) {
+TEST(RvcControllerTest, DuplicateDustRestartsThreeSecondTimerAndKeepsState) {
   ControllerFixture fixture;
   fixture.controller.PressPowerButton();
   fixture.controller.FrontPathClear();
@@ -160,8 +161,28 @@ TEST(RvcControllerTest, DuplicateDustRestartsTimer) {
 
   fixture.controller.DustDetected();
 
+  const ControllerSnapshot snapshot = fixture.controller.Snapshot();
+  EXPECT_EQ(snapshot.cleaning_state, CleaningState::PowerUpCleaning);
+  EXPECT_EQ(snapshot.last_cleaner, CleanerCommand::PowerUp);
+  EXPECT_EQ(snapshot.last_motion, MotionCommand::Forward);
   EXPECT_EQ(fixture.log.calls,
-            (std::vector<std::string>{"timer.restart:5", "cleaner.powerUp"}));
+            (std::vector<std::string>{"timer.restart:3", "cleaner.powerUp"}));
+}
+
+TEST(RvcControllerTest, FrontPathClearDuringPowerUpKeepsStateAndDrivesForward) {
+  ControllerFixture fixture;
+  fixture.controller.PressPowerButton();
+  fixture.controller.FrontPathClear();
+  fixture.controller.DustDetected();
+  fixture.log.calls.clear();
+
+  fixture.controller.FrontPathClear();
+
+  const ControllerSnapshot snapshot = fixture.controller.Snapshot();
+  EXPECT_EQ(snapshot.cleaning_state, CleaningState::PowerUpCleaning);
+  EXPECT_EQ(snapshot.last_cleaner, CleanerCommand::PowerUp);
+  EXPECT_EQ(snapshot.last_motion, MotionCommand::Forward);
+  EXPECT_EQ(fixture.log.calls, std::vector<std::string>{"motor.forward"});
 }
 
 TEST(RvcControllerTest, DustIsIgnoredDuringAvoidance) {

@@ -17,9 +17,10 @@ GRID_SIZE = 12
 # moving briskly, but still leaves time for the user to watch the simulation.
 TICK_MS = 350
 
-# Demo-only acceleration for the 5-second cleaner power-up timer so the
-# PowerUpCleaning visualization does not block the user for too long.
-POWER_UP_MS = 1500
+# Demo-only acceleration for the 3-second cleaner power-up timer so the
+# PowerUpCleaning visualization is quick enough for a manual demo while still
+# clearly visible.
+POWER_UP_MS = 1200
 
 LEFT_TURN = {
     (0, -1): (-1, 0),
@@ -57,6 +58,7 @@ class SimulatorUi:
 
         self.pending_motion_complete: str | None = None
         self.auto_drive_after_id: str | None = None
+        self.power_up_after_id: str | None = None
 
         self.canvas = tk.Canvas(
             self.root, width=GRID_SIZE * CELL_SIZE, height=GRID_SIZE * CELL_SIZE
@@ -163,6 +165,15 @@ class SimulatorUi:
             except tk.TclError:
                 pass
             self.auto_drive_after_id = None
+        self.cancel_power_up_timer()
+
+    def cancel_power_up_timer(self) -> None:
+        if self.power_up_after_id is not None:
+            try:
+                self.root.after_cancel(self.power_up_after_id)
+            except tk.TclError:
+                pass
+            self.power_up_after_id = None
 
     def tick(self) -> None:
         self.auto_drive_after_id = None
@@ -178,6 +189,18 @@ class SimulatorUi:
         new_side = self.consume_events(
             "sideSensorEvents", "applied_side_sensor_event_count"
         )
+
+        # Schedule / reschedule / cancel the power-up timer independently of
+        # the drive loop so the robot keeps moving forward while the cleaner
+        # is in booster mode.
+        for event in new_timer:
+            if event == "Cancel":
+                self.cancel_power_up_timer()
+            elif event.startswith("Start") or event.startswith("Restart"):
+                self.cancel_power_up_timer()
+                self.power_up_after_id = self.root.after(
+                    POWER_UP_MS, self.fire_power_up_timer
+                )
 
         # 1) Ack any motion the simulator animated but has not yet reported
         #    back. The controller only listens to MotionCompleted for
@@ -198,19 +221,13 @@ class SimulatorUi:
             self.send_front_sensor_from_map()
             return
 
-        # 4) A timer Start/Restart means we're in PowerUpCleaning. Wait for
-        #    the accelerated demo duration before reporting timer expired.
-        if any(e.startswith("Start") or e.startswith("Restart") for e in new_timer):
-            if self.snapshot.get("cleaningState") == "PowerUpCleaning":
-                self.auto_drive_after_id = self.root.after(
-                    POWER_UP_MS, self.fire_power_up_timer
-                )
-                return
-
-        # 5) In CleaningForward, keep driving: detect dust at the current
-        #    cell first; otherwise ask the front sensor about the next cell
-        #    so the controller can issue the next Forward step.
-        if self.snapshot.get("cleaningState") == "CleaningForward":
+        # 4) Keep driving forward while the controller is cleaning. In
+        #    PowerUpCleaning the robot must keep moving too, and entering
+        #    another dust cell during PowerUpCleaning must restart the
+        #    3-second timer (handled above when the controller emits a
+        #    Restart timer event).
+        cleaning = self.snapshot.get("cleaningState")
+        if cleaning in ("CleaningForward", "PowerUpCleaning"):
             if self.robot in self.dust:
                 self.dust.discard(self.robot)
                 self.send("dustDetected")
@@ -219,6 +236,7 @@ class SimulatorUi:
             return
 
     def fire_power_up_timer(self) -> None:
+        self.power_up_after_id = None
         if self.snapshot.get("powerState") != "On":
             return
         if self.snapshot.get("cleaningState") != "PowerUpCleaning":
