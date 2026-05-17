@@ -13,14 +13,21 @@ from rvc_client import RvcClient
 CELL_SIZE = 32
 GRID_SIZE = 12
 
-# Animation tick used between auto-drive steps. A small value keeps the robot
-# moving briskly, but still leaves time for the user to watch the simulation.
-TICK_MS = 350
+# Every simulation tick equals one second. A Forward / Backward / TurnLeft /
+# TurnRight motion is animated as exactly one tick, so the user sees the robot
+# move at one cell per second.
+TICK_MS = 1000
 
-# Demo-only acceleration for the 3-second cleaner power-up timer so the
-# PowerUpCleaning visualization is quick enough for a manual demo while still
-# clearly visible.
-POWER_UP_MS = 1200
+# Cleaner power-up booster lasts exactly three ticks. This matches the
+# controller-side 3-second timer so the visualization shows the booster for the
+# same duration as the underlying cleaning logic.
+POWER_UP_MS = 3 * TICK_MS
+
+# Op name used at connect time to fetch the current snapshot without changing
+# any state. The C++ bridge ignores unknown ops and just returns the snapshot,
+# which lets us seed the event counters and avoid replaying events that the
+# server accumulated during a previous simulator session.
+SYNC_OP = "__sync__"
 
 LEFT_TURN = {
     (0, -1): (-1, 0),
@@ -109,11 +116,40 @@ class SimulatorUi:
     def connect(self) -> None:
         try:
             self.client.connect()
-            self.status.set(
-                "Connected to controller\nPress Power Button to start auto-drive."
-            )
         except OSError as error:
             messagebox.showerror("Connection failed", str(error))
+            return
+
+        # Pull the current controller snapshot via a no-op so we can seed the
+        # event counters. Without this, any motor / sensor events that the
+        # server accumulated during a previous simulator session would be
+        # replayed and the robot would teleport when the user first presses
+        # Power Button.
+        try:
+            self.snapshot = self.client.send(SYNC_OP)
+        except (OSError, ConnectionError, json.JSONDecodeError) as error:
+            messagebox.showerror("Connection failed", str(error))
+            return
+
+        self.sync_counters_to_snapshot()
+        self.pending_motion_complete = None
+        self.cancel_auto_drive()
+        self.status.set(
+            "Connected to controller\nPress Power Button to start auto-drive."
+        )
+        self.draw()
+
+    def sync_counters_to_snapshot(self) -> None:
+        """Mark every event in the current snapshot as already consumed."""
+
+        def _len(key: str) -> int:
+            events = self.snapshot.get(key, [])
+            return len(events) if isinstance(events, list) else 0
+
+        self.applied_motor_event_count = _len("motorEvents")
+        self.applied_front_sensor_event_count = _len("frontSensorEvents")
+        self.applied_side_sensor_event_count = _len("sideSensorEvents")
+        self.applied_timer_event_count = _len("timerEvents")
 
     def press_power_button(self) -> None:
         self.send("pressPowerButton")

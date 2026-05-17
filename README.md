@@ -88,8 +88,22 @@ to **PowerUpCleaning** (the robot turns orange-red and the status shows
 **AvoidingObstacle** (turns purple) when its front cell is blocked, choosing
 to turn left/right or back up based on the surrounding cells.
 
+Timing:
+
+- One simulation tick is one second, so a Forward / Backward / TurnLeft /
+  TurnRight motion advances by one cell or one heading-step per second.
+- PowerUpCleaning lasts three seconds (three ticks). During those three seconds
+  the robot keeps moving forward; only `frontObstacleDetected` interrupts the
+  booster and triggers obstacle avoidance.
+- If a new dust cell is entered while PowerUpCleaning is already active, the
+  three-second timer is discarded and restarted from that moment.
+
 You can keep editing the map while the robot is running - newly placed
 obstacles and dust will affect the next sensor check.
+
+`Connect` also synchronizes the simulator's internal event counters with the
+controller's current snapshot, so restarting only the simulator UI no longer
+makes the robot jump to a strange position when you press Power Button.
 
 ### Buttons
 
