@@ -1,0 +1,17 @@
+---
+description: RVC OOAD project C++ build, test, CI/CD conventions
+alwaysApply: true
+---
+
+### CI/CD
+
+CI/CD: Github Actions
+IDE : VS Code
+Version Control: Github
+Target Language: C++
+Build : CMake
+Unit-test: G-test로 테스트 자동화
+System Test: 파이썬으로 제작한 시뮬레이터 환경에서 테스트
+Static Analysis: SonarCloud, Cppcheck, Clang-tidy
+Dynamic Analysis: Gcov
+Output & Feedback: Github Pages, Discord Webhook
