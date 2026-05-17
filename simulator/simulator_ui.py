@@ -22,6 +22,7 @@ class SimulatorUi:
         self.obstacles: set[tuple[int, int]] = set()
         self.dust: set[tuple[int, int]] = set()
         self.robot = (GRID_SIZE // 2, GRID_SIZE // 2)
+        self.heading = (0, -1)
         self.snapshot: dict[str, object] = {}
 
         self.canvas = tk.Canvas(
@@ -32,13 +33,21 @@ class SimulatorUi:
         self.canvas.bind("<Button-3>", self.toggle_dust)
 
         self.status = tk.StringVar(value="Disconnected")
-        tk.Label(self.root, textvariable=self.status, justify="left").grid(
+        tk.Label(
+            self.root,
+            textvariable=self.status,
+            justify="left",
+            anchor="nw",
+            width=44,
+            wraplength=340,
+        ).grid(
             row=0, column=1, sticky="nw"
         )
 
         buttons = [
             ("Connect", self.connect),
-            ("Power Button", lambda: self.send("pressPowerButton")),
+            ("Power Button", self.press_power_button),
+            ("Front From Map", self.apply_front_sensor_from_map),
             ("Front Clear", lambda: self.send("frontPathClear")),
             ("Front Obstacle", lambda: self.send("frontObstacleDetected")),
             ("Left Clear", lambda: self.send("sideSensorUpdated", leftBlocked=False, rightBlocked=True)),
@@ -61,17 +70,57 @@ class SimulatorUi:
     def connect(self) -> None:
         try:
             self.client.connect()
-            self.status.set("Connected to controller")
+            self.status.set("Connected to controller\nPress Power Button to start.")
         except OSError as error:
             messagebox.showerror("Connection failed", str(error))
 
-    def send(self, op: str, **payload: object) -> None:
+    def press_power_button(self) -> None:
+        snapshot = self.send("pressPowerButton")
+        if (
+            snapshot is not None
+            and snapshot.get("powerState") == "On"
+            and snapshot.get("cleaningState") == "CheckingFront"
+        ):
+            self.apply_front_sensor_from_map()
+
+    def send(self, op: str, **payload: object) -> dict[str, object] | None:
         try:
             self.snapshot = self.client.send(op, **payload)
-            self.status.set(json.dumps(self.snapshot, indent=2))
+            self.status.set(self.format_snapshot(self.snapshot))
             self.draw()
+            return self.snapshot
         except (OSError, ConnectionError, json.JSONDecodeError) as error:
             messagebox.showerror("Controller error", str(error))
+            return None
+
+    def apply_front_sensor_from_map(self) -> None:
+        front_cell = self.front_cell()
+        if front_cell in self.obstacles:
+            self.send("frontObstacleDetected")
+            return
+        self.send("frontPathClear")
+
+    def front_cell(self) -> tuple[int, int]:
+        return (self.robot[0] + self.heading[0], self.robot[1] + self.heading[1])
+
+    def format_snapshot(self, snapshot: dict[str, object]) -> str:
+        if not snapshot:
+            return "No controller state"
+
+        lines = [
+            f"Power: {snapshot.get('powerState', '-')}",
+            f"State: {snapshot.get('cleaningState', '-')}",
+            f"Motion: {snapshot.get('lastMotion', '-')}",
+            f"Cleaner: {snapshot.get('lastCleaner', '-')}",
+        ]
+
+        front_cell = self.front_cell()
+        lines.append("")
+        lines.append(f"Robot: {self.robot}, Front: {front_cell}")
+        lines.append(f"Front blocked: {front_cell in self.obstacles}")
+        lines.append(f"Front dust: {front_cell in self.dust}")
+
+        return "\n".join(lines)
 
     def toggle_obstacle(self, event: tk.Event) -> None:
         cell = (event.x // CELL_SIZE, event.y // CELL_SIZE)
