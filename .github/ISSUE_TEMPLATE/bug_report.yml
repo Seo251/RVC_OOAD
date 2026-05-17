@@ -1,0 +1,60 @@
+name: Bug report
+description: Report a defect, failed test, or unexpected RVC controller behavior.
+title: "[BUG] RVC-000: "
+labels: ["bug", "jira"]
+body:
+  - type: input
+    id: jira-key
+    attributes:
+      label: Jira issue key
+      description: Use the Jira key if this bug is tracked in Jira.
+      placeholder: RVC-124
+    validations:
+      required: false
+  - type: textarea
+    id: observed-behavior
+    attributes:
+      label: Observed behavior
+      description: What happened?
+      placeholder: The controller turns right even when the right sensor is blocked.
+    validations:
+      required: true
+  - type: textarea
+    id: expected-behavior
+    attributes:
+      label: Expected behavior
+      description: What should have happened?
+      placeholder: The controller should move backward when front, left, and right are blocked.
+    validations:
+      required: true
+  - type: textarea
+    id: reproduction
+    attributes:
+      label: Reproduction steps
+      description: Include sensor inputs, simulator steps, or failing tests.
+      placeholder: |
+        1. Set front_obstacle=true.
+        2. Set left_obstacle=true.
+        3. Set right_obstacle=true.
+        4. Call RvcController::Update().
+    validations:
+      required: true
+  - type: textarea
+    id: evidence
+    attributes:
+      label: Evidence
+      description: Attach CI logs, SonarCloud issue links, coverage findings, or screenshots.
+      placeholder: GitHub Actions run URL, SonarCloud issue URL, or failing test output.
+    validations:
+      required: false
+  - type: dropdown
+    id: severity
+    attributes:
+      label: Severity
+      options:
+        - Low
+        - Medium
+        - High
+        - Critical
+    validations:
+      required: true

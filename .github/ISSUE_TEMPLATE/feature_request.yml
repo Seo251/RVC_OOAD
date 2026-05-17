@@ -1,0 +1,58 @@
+name: Feature request
+description: Track an RVC controller feature request linked to Jira.
+title: "[FR] RVC-000: "
+labels: ["feature", "jira"]
+body:
+  - type: input
+    id: jira-key
+    attributes:
+      label: Jira issue key
+      description: Use the Jira key that owns this FR.
+      placeholder: RVC-123
+    validations:
+      required: true
+  - type: input
+    id: jira-link
+    attributes:
+      label: Jira issue link
+      description: Link to the Jira FR.
+      placeholder: https://your-domain.atlassian.net/browse/RVC-123
+    validations:
+      required: true
+  - type: textarea
+    id: summary
+    attributes:
+      label: Feature summary
+      description: Describe the user-visible behavior and why it is needed.
+      placeholder: The RVC should power up cleaning when dust is detected.
+    validations:
+      required: true
+  - type: textarea
+    id: acceptance-criteria
+    attributes:
+      label: Acceptance criteria
+      description: List observable outcomes that must be true before this FR is complete.
+      placeholder: |
+        - Given dust is detected, when the controller updates, then cleaning is PowerUp.
+        - Given the front sensor detects an obstacle, then the RVC turns to a clear side.
+    validations:
+      required: true
+  - type: textarea
+    id: test-plan
+    attributes:
+      label: Test plan
+      description: Describe expected unit, integration, or simulator tests.
+      placeholder: GTest cases for controller decisions and simulator scenario coverage.
+    validations:
+      required: true
+  - type: dropdown
+    id: priority
+    attributes:
+      label: Priority
+      options:
+        - Low
+        - Medium
+        - High
+        - Critical
+    validations:
+      required: true
