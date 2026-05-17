@@ -171,37 +171,60 @@ class SimulatorUi:
         try:
             self.snapshot = self.client.send(op, **payload)
         except (OSError, ConnectionError, json.JSONDecodeError) as error:
-            self.cancel_auto_drive()
+            self.stop_all_timers()
             messagebox.showerror("Controller error", str(error))
             return None
 
+        # Process snapshot side-effects in a fixed order:
+        #   1) animate any new motor events on the visual robot
+        #   2) honor timer Start / Restart / Cancel events from the cleaner
+        #      side. This runs in send() (not tick()) so a Start coming from a
+        #      cleaner-only event such as dustDetected immediately arms the
+        #      booster-expiry callback, independently of the drive loop.
         self.apply_motion_from_snapshot()
+        self.handle_new_timer_events()
         self.status.set(self.format_snapshot(self.snapshot))
         self.draw()
 
         if self.snapshot.get("powerState") == "On":
             self.schedule_tick()
         else:
-            self.cancel_auto_drive()
+            self.stop_all_timers()
 
         return self.snapshot
+
+    def handle_new_timer_events(self) -> None:
+        """Arm or cancel the booster-expiry callback from any new timer events."""
+        for event in self.consume_events(
+            "timerEvents", "applied_timer_event_count"
+        ):
+            if event == "Cancel":
+                self.cancel_power_up_timer()
+            elif event.startswith("Start") or event.startswith("Restart"):
+                self.cancel_power_up_timer()
+                self.power_up_after_id = self.root.after(
+                    POWER_UP_MS, self.fire_power_up_timer
+                )
 
     # ------------------------------------------------------------------
     # Auto-drive loop
     # ------------------------------------------------------------------
 
     def schedule_tick(self, delay: int = TICK_MS) -> None:
-        self.cancel_auto_drive()
+        # Only cancel the pending tick. The booster timer (power_up_after_id)
+        # runs on its own schedule (POWER_UP_MS) and must NOT be reset every
+        # time the drive loop reschedules itself, otherwise the booster would
+        # never expire while the robot is moving.
+        self.cancel_tick()
         self.auto_drive_after_id = self.root.after(delay, self.tick)
 
-    def cancel_auto_drive(self) -> None:
+    def cancel_tick(self) -> None:
         if self.auto_drive_after_id is not None:
             try:
                 self.root.after_cancel(self.auto_drive_after_id)
             except tk.TclError:
                 pass
             self.auto_drive_after_id = None
-        self.cancel_power_up_timer()
 
     def cancel_power_up_timer(self) -> None:
         if self.power_up_after_id is not None:
@@ -211,14 +234,20 @@ class SimulatorUi:
                 pass
             self.power_up_after_id = None
 
+    def stop_all_timers(self) -> None:
+        """Cancel both the drive tick and the booster timer (used on power off / error)."""
+        self.cancel_tick()
+        self.cancel_power_up_timer()
+
+    # Backwards-compatible alias for callers that previously cancelled
+    # everything through cancel_auto_drive().
+    cancel_auto_drive = stop_all_timers
+
     def tick(self) -> None:
         self.auto_drive_after_id = None
         if not self.snapshot or self.snapshot.get("powerState") != "On":
             return
 
-        new_timer = self.consume_events(
-            "timerEvents", "applied_timer_event_count"
-        )
         new_front = self.consume_events(
             "frontSensorEvents", "applied_front_sensor_event_count"
         )
@@ -226,20 +255,8 @@ class SimulatorUi:
             "sideSensorEvents", "applied_side_sensor_event_count"
         )
 
-        # Schedule / reschedule / cancel the power-up timer independently of
-        # the drive loop so the robot keeps moving forward while the cleaner
-        # is in booster mode.
-        for event in new_timer:
-            if event == "Cancel":
-                self.cancel_power_up_timer()
-            elif event.startswith("Start") or event.startswith("Restart"):
-                self.cancel_power_up_timer()
-                self.power_up_after_id = self.root.after(
-                    POWER_UP_MS, self.fire_power_up_timer
-                )
-
-        # 1) Ack any motion the simulator animated but has not yet reported
-        #    back. The controller only listens to MotionCompleted for
+        # 1) Ack any motion the simulator already animated but has not yet
+        #    reported back. The controller only listens to MotionCompleted for
         #    Backward / TurnLeft / TurnRight.
         if self.pending_motion_complete is not None:
             motion = self.pending_motion_complete
@@ -257,17 +274,17 @@ class SimulatorUi:
             self.send_front_sensor_from_map()
             return
 
-        # 4) Keep driving forward while the controller is cleaning. In
-        #    PowerUpCleaning the robot must keep moving too, and entering
-        #    another dust cell during PowerUpCleaning must restart the
-        #    3-second timer (handled above when the controller emits a
-        #    Restart timer event).
+        # 4) Keep driving forward in cleaning states. NFR-011: cleaner-only
+        #    events MUST NOT pause motor motion, so when the current cell has
+        #    dust we notify the controller AND immediately continue with the
+        #    next forward step in the same tick. The robot therefore advances
+        #    one cell per tick regardless of whether dust was detected.
         cleaning = self.snapshot.get("cleaningState")
         if cleaning in ("CleaningForward", "PowerUpCleaning"):
             if self.robot in self.dust:
                 self.dust.discard(self.robot)
-                self.send("dustDetected")
-                return
+                if self.send("dustDetected") is None:
+                    return
             self.send_front_sensor_from_map()
             return
 

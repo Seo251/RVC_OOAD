@@ -185,6 +185,36 @@ TEST(RvcControllerTest, FrontPathClearDuringPowerUpKeepsStateAndDrivesForward) {
   EXPECT_EQ(fixture.log.calls, std::vector<std::string>{"motor.forward"});
 }
 
+// NFR-011: cleaner-only events (dustDetected, repeated dustDetected,
+// powerUpTimerExpired) must never touch the motor port. This test exercises
+// the full PowerUpCleaning enter / restart / expire sequence and asserts that
+// every recorded call belongs to the cleaner or the timer, never the motor.
+TEST(RvcControllerTest,
+     CleanerOnlyEventsDoNotIssueMotorCommandsDuringPowerUpFlow) {
+  ControllerFixture fixture;
+  fixture.controller.PressPowerButton();
+  fixture.controller.FrontPathClear();
+  fixture.log.calls.clear();
+
+  fixture.controller.DustDetected();
+  fixture.controller.DustDetected();
+  fixture.controller.PowerUpTimerExpired();
+
+  const ControllerSnapshot snapshot = fixture.controller.Snapshot();
+  EXPECT_EQ(snapshot.last_motion, MotionCommand::Forward);
+  EXPECT_EQ(snapshot.cleaning_state, CleaningState::CleaningForward);
+
+  for (const std::string& call : fixture.log.calls) {
+    EXPECT_EQ(call.rfind("motor.", 0), std::string::npos)
+        << "Cleaner-only flow produced motor call: " << call;
+  }
+
+  EXPECT_EQ(fixture.log.calls,
+            (std::vector<std::string>{"cleaner.powerUp", "timer.start:3",
+                                      "timer.restart:3", "cleaner.powerUp",
+                                      "cleaner.on"}));
+}
+
 TEST(RvcControllerTest, DustIsIgnoredDuringAvoidance) {
   ControllerFixture fixture;
   fixture.controller.PressPowerButton();

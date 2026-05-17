@@ -22,10 +22,10 @@
 | FR-012 | 좌측과 우측 모두 장애물이 있으면 `rvc_controller`는 좌측 또는 우측 중 하나가 비어 있을 때까지 motor에 후진 명령을 내려야 한다. |
 | FR-013 | 후진 중 좌측 또는 우측 중 하나가 비어 있으면 `rvc_controller`는 장애물이 없는 방향으로 회전해야 한다. |
 | FR-014 | 장애물 회피 프로세스가 종료되면 `rvc_controller`는 다시 motor를 전진시키고 cleaner를 켜야 한다. |
-| FR-015 | 전진 중 전방 먼지가 감지되면 `rvc_controller`는 전진 동작을 유지하면서 cleaner의 흡입력을 3초 동안 증가시켜야 한다. |
-| FR-016 | 흡입력 증가 후 3초가 지나면 `rvc_controller`는 cleaner의 흡입력을 정상화하고 전진 청소를 계속해야 한다. |
+| FR-015 | 전진 중 전방 먼지가 감지되면 `rvc_controller`는 motor의 전진 동작을 멈추거나 지연시키지 않은 채 cleaner의 흡입력만 3초 동안 증가시켜야 한다. |
+| FR-016 | 흡입력 증가 후 3초가 지나면 `rvc_controller`는 cleaner의 흡입력을 정상화해야 하며, 이 변경은 motor의 전진 동작에 영향을 주지 않아야 한다. |
 | FR-017 | 흡입력 증가 중 전방 장애물이 감지되면 `rvc_controller`는 증가된 시간을 저장하지 않고 즉시 cleaner를 끄고 장애물 회피 프로세스를 시작해야 한다. |
-| FR-021 | 흡입력 증가 중 다시 먼지가 감지되면 `rvc_controller`는 이전 타이머를 폐기하고 그 시점부터 다시 3초 타이머를 시작해야 한다. |
+| FR-021 | 흡입력 증가 중 다시 먼지가 감지되면 `rvc_controller`는 이전 타이머를 폐기하고 그 시점부터 다시 3초 타이머를 시작해야 한다. 이 재시작은 motor 동작에 영향을 주지 않는다. |
 | FR-018 | `rvc_controller`는 motor 명령을 `Forward`, `Backward`, `Left`, `Right`, `Stop` 중 하나로 출력해야 한다. |
 | FR-019 | `rvc_controller`는 cleaner 명령을 `Off`, `On`, `PowerUp` 중 하나로 출력해야 한다. |
 | FR-020 | `rvc_controller`는 전방 센서, 좌측 센서, 우측 센서, 먼지 센서, 사용자 버튼 입력을 처리해야 한다. |
@@ -44,6 +44,7 @@
 | NFR-008 | 전원 상태, 청소 상태, 회피 상태, 흡입력 증가 상태는 명확한 상태 모델로 표현되어야 한다. |
 | NFR-009 | 잘못된 센서 조합이나 반복 입력에도 controller는 정의되지 않은 motor/cleaner 명령을 출력하지 않아야 한다. |
 | NFR-010 | 본 Inception 범위에서는 모터 각도, 속도, 흡입력 세기 등 하드웨어 상세 파라미터를 결정하지 않는다. |
+| NFR-011 | Motor 출력(`Forward`, `Backward`, `Left`, `Right`, `Stop`)과 Cleaner 출력(`Off`, `On`, `PowerUp`)은 서로 독립적으로 결정되어야 한다. Motor 상태 변화는 Cleaner 상태에 영향을 줄 수 있으나(예: 전방 장애물 → cleaner off, 전진 시작 → cleaner on), 반대로 Cleaner 상태 변화는 Motor 상태나 진행을 변경하지 않아야 한다(예: 먼지 감지로 cleaner가 `PowerUp`이 되어도 motor의 전진은 멈추거나 느려지지 않는다). |
 
 ## Use Cases
 
@@ -90,9 +91,9 @@
 | Supporting Actors | Cleaner, Timer, Motor |
 | Trigger | 전진 중 전방 먼지가 감지된다. |
 | Preconditions | `rvc_controller` 전원이 켜져 있고 Motor가 전진 중이며 Cleaner가 켜져 있다. |
-| Postconditions | 3초 동안 전진을 유지하면서 흡입력이 증가한 뒤 정상 흡입력으로 복귀한다. |
-| Main Success Scenario | 1. Dust Sensor가 먼지를 감지한다.<br>2. `rvc_controller`가 Cleaner에 `PowerUp` 명령을 보낸다.<br>3. `rvc_controller`가 3초 타이머를 시작한다.<br>4. `rvc_controller`는 Motor를 `Forward`로 유지하면서 power-up 청소 상태를 지속한다.<br>5. 3초가 경과한다.<br>6. `rvc_controller`가 Cleaner에 `On` 명령을 보내 정상 흡입력으로 복귀하고 전진 청소를 계속한다. |
-| Extensions | 3a. 3초가 지나기 전에 전방 장애물이 감지되면 증가 시간을 저장하지 않는다.<br>3a1. `rvc_controller`가 Cleaner에 `Off` 명령을 보낸다.<br>3a2. UC-003을 수행한다.<br>4a. Power-up 중 다시 먼지가 감지되면 `rvc_controller`는 이전 타이머를 폐기하고 그 시점부터 새 3초 타이머를 시작한다 (FR-021). Motor와 Cleaner 상태는 그대로 유지된다. |
+| Postconditions | 3초 동안 motor의 전진은 한 번도 멈추지 않고 그대로 유지되며, cleaner만 흡입력이 증가한 뒤 정상 흡입력으로 복귀한다. |
+| Main Success Scenario | 1. Dust Sensor가 먼지를 감지한다.<br>2. `rvc_controller`가 Cleaner에 `PowerUp` 명령을 보낸다 (NFR-011: motor 명령은 발생하지 않는다).<br>3. `rvc_controller`가 3초 타이머를 시작한다.<br>4. Motor는 직전 상태인 `Forward`를 그대로 유지하며 평소와 동일한 속도로 한 칸씩 전진한다.<br>5. 3초가 경과한다.<br>6. `rvc_controller`가 Cleaner에 `On` 명령을 보내 정상 흡입력으로 복귀한다 (NFR-011: motor 명령은 여전히 발생하지 않으며 전진은 끊김 없이 계속된다). |
+| Extensions | 3a. 3초가 지나기 전에 전방 장애물이 감지되면 증가 시간을 저장하지 않는다.<br>3a1. `rvc_controller`가 Cleaner에 `Off` 명령을 보낸다.<br>3a2. UC-003을 수행한다 (motor 변화는 회피 절차의 일부로만 발생한다).<br>4a. Power-up 중 다시 먼지가 감지되면 `rvc_controller`는 이전 타이머를 폐기하고 그 시점부터 새 3초 타이머를 시작한다 (FR-021). Motor 명령은 발생하지 않으며 전진은 끊김 없이 유지된다. |
 
 ## Diagram Files
 
