@@ -58,13 +58,37 @@ jobs:
 
       - name: Run Cppcheck
         run: |
+          python3 - <<'PY'
+          import json
+          import pathlib
+
+          repo_root = pathlib.Path.cwd().resolve()
+          compile_commands = pathlib.Path("build/compile_commands.json")
+          commands = json.loads(compile_commands.read_text(encoding="utf-8"))
+          allowed_dirs = {"src", "tests"}
+          filtered = []
+
+          for entry in commands:
+              source = pathlib.Path(entry["file"]).resolve()
+              try:
+                  relative = source.relative_to(repo_root)
+              except ValueError:
+                  continue
+              if relative.parts and relative.parts[0] in allowed_dirs:
+                  filtered.append(entry)
+
+          output = pathlib.Path("build/cppcheck-compile-commands.json")
+          output.write_text(json.dumps(filtered, indent=2), encoding="utf-8")
+          print(f"Wrote {len(filtered)} Cppcheck compile commands to {output}")
+          PY
+
           cppcheck \
             --enable=all \
             --inconclusive \
             --std=c++17 \
             --suppress=missingIncludeSystem \
             --error-exitcode=1 \
-            include src tests
+            --project="${BUILD_DIR}/cppcheck-compile-commands.json"
 
       - name: Run clang-tidy
         run: |
