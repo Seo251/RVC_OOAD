@@ -131,7 +131,7 @@ jobs:
         run: |
           mkdir -p "${COVERAGE_DIR}"
           lcov --capture --directory "${BUILD_DIR}" --ignore-errors mismatch --output-file "${COVERAGE_DIR}/coverage.info"
-          lcov --remove "${COVERAGE_DIR}/coverage.info" '/usr/*' '*/tests/*' '*/test/*' --output-file "${COVERAGE_DIR}/coverage.filtered.info"
+          lcov --remove "${COVERAGE_DIR}/coverage.info" '/usr/*' '*/tests/*' '*/build/_deps/*' '*/_deps/*' --ignore-errors unused --output-file "${COVERAGE_DIR}/coverage.filtered.info"
           genhtml "${COVERAGE_DIR}/coverage.filtered.info" --output-directory "${COVERAGE_DIR}/html"
           gcovr --root . --filter src --exclude tests --xml-pretty --output "${COVERAGE_DIR}/coverage.xml" "${BUILD_DIR}"
           gcovr --root . --filter src --exclude tests --sonarqube --output "${COVERAGE_DIR}/sonarqube.xml" "${BUILD_DIR}"
