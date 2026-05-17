@@ -1,0 +1,23 @@
+# Build outputs
+/build/
+/cmake-build-*/
+
+# Coverage outputs
+/coverage/
+*.gcda
+*.gcno
+*.gcov
+*.info
+
+# CMake generated files
+CMakeCache.txt
+CMakeFiles/
+compile_commands.json
+Testing/
+
+# Editor and OS metadata
+.vscode/
+*.user
+*.swp
+*:Zone.Identifier
+*Zone.Identifier

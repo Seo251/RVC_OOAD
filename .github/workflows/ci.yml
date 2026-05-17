@@ -1,0 +1,176 @@
+name: RVC Controller CI
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pull-requests: read
+
+env:
+  BUILD_DIR: build
+  COVERAGE_DIR: coverage
+
+jobs:
+  build-test-analysis:
+    name: Build, Test, Static Analysis, Coverage
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout source
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Install toolchain and analysis tools
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            build-essential \
+            clang-tidy \
+            cmake \
+            cppcheck \
+            curl \
+            gcovr \
+            lcov \
+            ninja-build \
+            python3
+
+      - name: Configure CMake
+        run: |
+          cmake -S . -B "${BUILD_DIR}" -G Ninja \
+            -DCMAKE_BUILD_TYPE=Debug \
+            -DCMAKE_EXPORT_COMPILE_COMMANDS=ON \
+            -DCMAKE_CXX_FLAGS="--coverage -O0 -g" \
+            -DCMAKE_C_FLAGS="--coverage -O0 -g" \
+            -DCMAKE_EXE_LINKER_FLAGS="--coverage"
+
+      - name: Build
+        run: cmake --build "${BUILD_DIR}"
+
+      - name: Run GTest via CTest
+        run: ctest --test-dir "${BUILD_DIR}" --output-on-failure
+
+      - name: Run Cppcheck
+        run: |
+          cppcheck \
+            --enable=all \
+            --inconclusive \
+            --std=c++17 \
+            --project="${BUILD_DIR}/compile_commands.json" \
+            --suppress=missingIncludeSystem \
+            --error-exitcode=1
+
+      - name: Run clang-tidy
+        run: |
+          python3 - <<'PY'
+          import json
+          import pathlib
+          import subprocess
+          import sys
+
+          compile_commands = pathlib.Path("build/compile_commands.json")
+          commands = json.loads(compile_commands.read_text(encoding="utf-8"))
+          sources = sorted({
+              entry["file"]
+              for entry in commands
+              if pathlib.Path(entry["file"]).suffix in {".c", ".cc", ".cpp", ".cxx"}
+          })
+
+          if not sources:
+              print("No C/C++ source files found in compile_commands.json.")
+              sys.exit(0)
+
+          result = subprocess.run(
+              ["clang-tidy", f"-p={compile_commands.parent}", *sources],
+              check=False,
+          )
+          sys.exit(result.returncode)
+          PY
+
+      - name: Capture coverage
+        run: |
+          mkdir -p "${COVERAGE_DIR}"
+          lcov --capture --directory "${BUILD_DIR}" --output-file "${COVERAGE_DIR}/coverage.info"
+          lcov --remove "${COVERAGE_DIR}/coverage.info" '/usr/*' '*/tests/*' '*/test/*' --output-file "${COVERAGE_DIR}/coverage.filtered.info"
+          genhtml "${COVERAGE_DIR}/coverage.filtered.info" --output-directory "${COVERAGE_DIR}/html"
+          gcovr --root . --xml-pretty --output "${COVERAGE_DIR}/coverage.xml" "${BUILD_DIR}"
+          gcovr --root . --sonarqube --output "${COVERAGE_DIR}/sonarqube.xml" "${BUILD_DIR}"
+
+      - name: Upload coverage report
+        uses: actions/upload-artifact@v4
+        with:
+          name: gcov-lcov-coverage-report
+          path: |
+            ${{ env.COVERAGE_DIR }}/coverage.filtered.info
+            ${{ env.COVERAGE_DIR }}/coverage.xml
+            ${{ env.COVERAGE_DIR }}/sonarqube.xml
+            ${{ env.COVERAGE_DIR }}/html
+          if-no-files-found: error
+
+      - name: Run SonarCloud analysis
+        uses: SonarSource/sonarqube-scan-action@v5
+        env:
+          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+          SONAR_HOST_URL: https://sonarcloud.io
+        with:
+          args: >
+            -Dsonar.organization=${{ vars.SONAR_ORGANIZATION }}
+            -Dsonar.projectKey=${{ vars.SONAR_PROJECT_KEY }}
+            -Dsonar.sources=.
+            -Dsonar.exclusions=build/**,coverage/**,.github/**
+            -Dsonar.cfamily.compile-commands=${{ env.BUILD_DIR }}/compile_commands.json
+            -Dsonar.coverageReportPaths=${{ env.COVERAGE_DIR }}/sonarqube.xml
+
+      - name: Notify Discord
+        if: always()
+        env:
+          DISCORD_WEBHOOK_URL: ${{ secrets.DISCORD_WEBHOOK_URL }}
+          JOB_STATUS: ${{ job.status }}
+          REPOSITORY: ${{ github.repository }}
+          REF_NAME: ${{ github.ref_name }}
+          SHA: ${{ github.sha }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: |
+          if [ -z "${DISCORD_WEBHOOK_URL}" ]; then
+            echo "DISCORD_WEBHOOK_URL is not configured; skipping Discord notification."
+            exit 0
+          fi
+
+          if [ "${JOB_STATUS}" = "success" ]; then
+            COLOR=3066993
+          else
+            COLOR=15158332
+          fi
+          export COLOR
+
+          python3 - <<'PY' > discord-payload.json
+          import json
+          import os
+
+          payload = {
+              "embeds": [
+                  {
+                      "title": "RVC Controller CI Result",
+                      "description": f"Build, GTest/CTest, static analysis, and coverage completed with status: {os.environ['JOB_STATUS']}",
+                      "color": int(os.environ["COLOR"]),
+                      "fields": [
+                          {"name": "Repository", "value": os.environ["REPOSITORY"], "inline": True},
+                          {"name": "Branch", "value": os.environ["REF_NAME"], "inline": True},
+                          {"name": "Commit", "value": os.environ["SHA"][:7], "inline": True},
+                          {"name": "Run", "value": os.environ["RUN_URL"], "inline": False},
+                      ],
+                  }
+              ]
+          }
+          print(json.dumps(payload))
+          PY
+
+          curl \
+            -H "Content-Type: application/json" \
+            -d @discord-payload.json \
+            "${DISCORD_WEBHOOK_URL}"
