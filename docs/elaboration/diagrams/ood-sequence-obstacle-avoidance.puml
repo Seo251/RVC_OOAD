@@ -7,48 +7,53 @@ actor MotorEvent
 actor User
 participant "RvcController" as Controller
 participant "ControllerState" as State
-participant "PowerUpTimerPort" as Timer
+participant "TimerPort" as Timer
 participant "CleanerPort" as Cleaner
 participant "ObstacleAvoidancePolicy" as Policy
+participant "SideSensorPort" as SideSensor
 participant "MotorPort" as Motor
 
-FrontSensor -> Controller: frontObstacleDetected()
-Controller -> State: isPoweredOn()
-State --> Controller: true
-Controller -> Timer: cancel()
-Controller -> Cleaner: turnOff()
-Controller -> State: setCleaningState(AvoidingObstacle)
-Controller -> SideSensors: requestSideCheck()
+FrontSensor -> Controller: FrontObstacleDetected()
+Controller -> State: IsPoweredOff()
+State --> Controller: false
+Controller -> Timer: CancelPowerUpTimer()
+Controller -> Cleaner: TurnOff()
+Controller -> State: SetCleaningState(AvoidingObstacle)
+Controller -> SideSensor: RequestSideCheck()
 
-SideSensors -> Controller: sideSensorUpdated(leftBlocked, rightBlocked)
-Controller -> State: isAvoidingObstacle()
+SideSensors -> Controller: SideSensorUpdated(leftBlocked, rightBlocked)
+Controller -> State: IsAvoidingObstacle()
 State --> Controller: true
-Controller -> Policy: selectMotion(leftBlocked, rightBlocked)
+Controller -> Policy: SelectMotion(leftBlocked, rightBlocked)
 
 alt left side is clear
   Policy --> Controller: TurnLeft
-  Controller -> Motor: turnLeft()
+  Controller -> Motor: TurnLeft()
 else left blocked and right clear
   Policy --> Controller: TurnRight
-  Controller -> Motor: turnRight()
+  Controller -> Motor: TurnRight()
 else both sides are blocked
   Policy --> Controller: Backward
-  Controller -> Motor: backward()
-  MotorEvent -> Controller: motionCompleted(Backward)
-  Controller -> SideSensors: requestSideCheck()
+  Controller -> Motor: Backward()
+  MotorEvent -> Controller: MotionCompleted(Backward)
+  Controller -> State: IsAvoidingObstacle()
+  State --> Controller: true
+  Controller -> SideSensor: RequestSideCheck()
 end
 
 alt turn motion completed
-  MotorEvent -> Controller: motionCompleted(TurnLeft or TurnRight)
-  Controller -> State: setCleaningState(CleaningForward)
-  Controller -> Motor: forward()
-  Controller -> Cleaner: turnOn()
+  MotorEvent -> Controller: MotionCompleted(TurnLeft or TurnRight)
+  Controller -> State: IsAvoidingObstacle()
+  State --> Controller: true
+  Controller -> State: SetCleaningState(CleaningForward)
+  Controller -> Motor: Forward()
+  Controller -> Cleaner: TurnOn()
 else user powers off during avoidance
-  User -> Controller: pressPowerButton()
-  Controller -> Timer: cancel()
-  Controller -> Motor: stop()
-  Controller -> Cleaner: turnOff()
-  Controller -> State: setCleaningState(PoweredOff)
-  Controller -> State: setPowerState(Off)
+  User -> Controller: PressPowerButton()
+  Controller -> Timer: CancelPowerUpTimer()
+  Controller -> Motor: Stop()
+  Controller -> Cleaner: TurnOff()
+  Controller -> State: SetCleaningState(PoweredOff)
+  Controller -> State: SetPowerState(Off)
 end
 @enduml

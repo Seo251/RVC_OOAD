@@ -7,64 +7,67 @@ actor TimerEvent
 participant "RvcController" as Controller
 participant "ControllerState" as State
 participant "CleanerPort" as Cleaner
-participant "PowerUpTimerPort" as Timer
+participant "TimerPort" as Timer
 participant "MotorPort" as Motor
+participant "SideSensorPort" as SideSensor
 
 == Dust detected during forward cleaning ==
-DustSensor -> Controller: dustDetected()
-Controller -> State: currentCleaningState()
+DustSensor -> Controller: DustDetected()
+Controller -> State: CurrentCleaningState()
 State --> Controller: CleaningForward
-Controller -> Cleaner: powerUp()
-Controller -> Timer: start(3 seconds)
-Controller -> State: setCleaningState(PowerUpCleaning)
+Controller -> Cleaner: PowerUp()
+Controller -> Timer: StartPowerUpTimer(3)
+Controller -> State: SetCleaningState(PowerUpCleaning)
 note right of Controller
   Motor stays at Forward.
-  Subsequent frontPathClear()
-  events keep issuing motor.forward()
+  Subsequent FrontPathClear()
+  events keep issuing Motor.Forward()
   while staying in PowerUpCleaning.
 end note
 
 == Forward step continues during power-up ==
-FrontSensor -> Controller: frontPathClear()
-Controller -> State: currentCleaningState()
+FrontSensor -> Controller: FrontPathClear()
+Controller -> State: IsPoweredOff()
+State --> Controller: false
+Controller -> State: CurrentCleaningState()
 State --> Controller: PowerUpCleaning
-Controller -> Motor: forward()
+Controller -> Motor: Forward()
 note right of Controller
   Cleaner and timer are NOT touched.
 end note
 
 == Dust detected again during power-up ==
-DustSensor -> Controller: dustDetected()
-Controller -> State: currentCleaningState()
+DustSensor -> Controller: DustDetected()
+Controller -> State: CurrentCleaningState()
 State --> Controller: PowerUpCleaning
-Controller -> Timer: restart(3 seconds)
-Controller -> Cleaner: powerUp()
+Controller -> Timer: RestartPowerUpTimer(3)
+Controller -> Cleaner: PowerUp()
 
 alt timer expires without obstacle
-  TimerEvent -> Controller: powerUpTimerExpired()
-  Controller -> State: currentCleaningState()
+  TimerEvent -> Controller: PowerUpTimerExpired()
+  Controller -> State: CurrentCleaningState()
   State --> Controller: PowerUpCleaning
-  Controller -> Cleaner: turnOn()
-  Controller -> State: setCleaningState(CleaningForward)
+  Controller -> Cleaner: TurnOn()
+  Controller -> State: SetCleaningState(CleaningForward)
 else front obstacle interrupts power-up
-  FrontSensor -> Controller: frontObstacleDetected()
-  Controller -> Timer: cancel()
-  Controller -> Cleaner: turnOff()
-  Controller -> State: setCleaningState(AvoidingObstacle)
+  FrontSensor -> Controller: FrontObstacleDetected()
+  Controller -> Timer: CancelPowerUpTimer()
+  Controller -> Cleaner: TurnOff()
+  Controller -> State: SetCleaningState(AvoidingObstacle)
+  Controller -> SideSensor: RequestSideCheck()
 else dust detected during avoidance
-  DustSensor -> Controller: dustDetected()
-  Controller -> State: currentCleaningState()
+  DustSensor -> Controller: DustDetected()
+  Controller -> State: CurrentCleaningState()
   State --> Controller: AvoidingObstacle
   Controller -> Controller: ignore event
-  Controller -> Cleaner: keepOff()
 end
 
 == Power off during power-up ==
 actor User
-User -> Controller: pressPowerButton()
-Controller -> Timer: cancel()
-Controller -> Motor: stop()
-Controller -> Cleaner: turnOff()
-Controller -> State: setCleaningState(PoweredOff)
-Controller -> State: setPowerState(Off)
+User -> Controller: PressPowerButton()
+Controller -> Timer: CancelPowerUpTimer()
+Controller -> Motor: Stop()
+Controller -> Cleaner: TurnOff()
+Controller -> State: SetCleaningState(PoweredOff)
+Controller -> State: SetPowerState(Off)
 @enduml

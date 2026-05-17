@@ -12,13 +12,13 @@ actor Timer
 actor Motor
 
 rectangle "rvc_controller boundary" {
-  usecase "pressPowerButton()" as OpPower
-  usecase "frontObstacleDetected()" as OpFrontObstacle
-  usecase "frontPathClear()" as OpFrontClear
-  usecase "sideSensorUpdated(leftBlocked, rightBlocked)" as OpSide
-  usecase "dustDetected()" as OpDust
-  usecase "powerUpTimerExpired()" as OpTimer
-  usecase "motionCompleted(motion)" as OpMotion
+  usecase "PressPowerButton()" as OpPower
+  usecase "FrontObstacleDetected()" as OpFrontObstacle
+  usecase "FrontPathClear()" as OpFrontClear
+  usecase "SideSensorUpdated(leftBlocked, rightBlocked)" as OpSide
+  usecase "DustDetected()" as OpDust
+  usecase "PowerUpTimerExpired()" as OpTimer
+  usecase "MotionCompleted(motion)" as OpMotion
 }
 
 User --> OpPower

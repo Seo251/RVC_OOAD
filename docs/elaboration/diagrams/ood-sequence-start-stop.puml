@@ -5,37 +5,45 @@ actor User
 participant "RvcController" as Controller
 participant "ControllerState" as State
 participant "FrontSensorPort" as FrontSensor
+participant "SideSensorPort" as SideSensor
 participant "MotorPort" as Motor
 participant "CleanerPort" as Cleaner
-participant "PowerUpTimerPort" as Timer
+participant "TimerPort" as Timer
 
 == Start when powered off ==
-User -> Controller: pressPowerButton()
-Controller -> State: isPoweredOff()
+User -> Controller: PressPowerButton()
+Controller -> State: IsPoweredOff()
 State --> Controller: true
-Controller -> State: setPowerState(On)
-Controller -> State: setCleaningState(CheckingFront)
-Controller -> FrontSensor: requestFrontCheck()
+Controller -> State: SetPowerState(On)
+Controller -> State: SetCleaningState(CheckingFront)
+Controller -> FrontSensor: RequestFrontCheck()
 
 alt front path clear
-  FrontSensor -> Controller: frontPathClear()
-  Controller -> State: setCleaningState(CleaningForward)
-  Controller -> Motor: forward()
-  Controller -> Cleaner: turnOn()
+  FrontSensor -> Controller: FrontPathClear()
+  Controller -> State: IsPoweredOff()
+  State --> Controller: false
+  Controller -> State: CurrentCleaningState()
+  State --> Controller: CheckingFront
+  Controller -> State: SetCleaningState(CleaningForward)
+  Controller -> Motor: Forward()
+  Controller -> Cleaner: TurnOn()
 else front obstacle detected
-  FrontSensor -> Controller: frontObstacleDetected()
-  Controller -> Timer: cancel()
-  Controller -> Cleaner: turnOff()
-  Controller -> State: setCleaningState(AvoidingObstacle)
+  FrontSensor -> Controller: FrontObstacleDetected()
+  Controller -> State: IsPoweredOff()
+  State --> Controller: false
+  Controller -> Timer: CancelPowerUpTimer()
+  Controller -> Cleaner: TurnOff()
+  Controller -> State: SetCleaningState(AvoidingObstacle)
+  Controller -> SideSensor: RequestSideCheck()
 end
 
 == Stop while powered on ==
-User -> Controller: pressPowerButton()
-Controller -> State: isPoweredOn()
-State --> Controller: true
-Controller -> Timer: cancel()
-Controller -> Motor: stop()
-Controller -> Cleaner: turnOff()
-Controller -> State: setCleaningState(PoweredOff)
-Controller -> State: setPowerState(Off)
+User -> Controller: PressPowerButton()
+Controller -> State: IsPoweredOff()
+State --> Controller: false
+Controller -> Timer: CancelPowerUpTimer()
+Controller -> Motor: Stop()
+Controller -> Cleaner: TurnOff()
+Controller -> State: SetCleaningState(PoweredOff)
+Controller -> State: SetPowerState(Off)
 @enduml

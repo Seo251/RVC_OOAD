@@ -255,6 +255,53 @@ TEST(RvcControllerTest, EventsAreIgnoredWhenPoweredOff) {
   EXPECT_TRUE(fixture.log.calls.empty());
 }
 
+TEST(RvcControllerTest, NonMatchingStateEventsAreIgnored) {
+  ControllerFixture fixture;
+  fixture.controller.PressPowerButton();
+  fixture.log.calls.clear();
+
+  fixture.controller.SideSensorUpdated(false, false);
+  fixture.controller.PowerUpTimerExpired();
+  fixture.controller.MotionCompleted(MotionCommand::TurnLeft);
+  fixture.controller.DustDetected();
+
+  const ControllerSnapshot snapshot = fixture.controller.Snapshot();
+  EXPECT_EQ(snapshot.cleaning_state, CleaningState::CheckingFront);
+  EXPECT_EQ(snapshot.last_motion, MotionCommand::Stop);
+  EXPECT_EQ(snapshot.last_cleaner, CleanerCommand::Off);
+  EXPECT_TRUE(fixture.log.calls.empty());
+}
+
+TEST(RvcControllerTest, MotionCompletionIgnoresUnsupportedAvoidanceMotions) {
+  ControllerFixture fixture;
+  fixture.controller.PressPowerButton();
+  fixture.controller.FrontObstacleDetected();
+  fixture.log.calls.clear();
+
+  fixture.controller.MotionCompleted(MotionCommand::Stop);
+  fixture.controller.MotionCompleted(MotionCommand::Forward);
+
+  const ControllerSnapshot snapshot = fixture.controller.Snapshot();
+  EXPECT_EQ(snapshot.cleaning_state, CleaningState::AvoidingObstacle);
+  EXPECT_TRUE(fixture.log.calls.empty());
+}
+
+TEST(RvcControllerTest, TurnRightCompletionAlsoResumesForwardCleaning) {
+  ControllerFixture fixture;
+  fixture.controller.PressPowerButton();
+  fixture.controller.FrontObstacleDetected();
+  fixture.log.calls.clear();
+
+  fixture.controller.MotionCompleted(MotionCommand::TurnRight);
+
+  const ControllerSnapshot snapshot = fixture.controller.Snapshot();
+  EXPECT_EQ(snapshot.cleaning_state, CleaningState::CleaningForward);
+  EXPECT_EQ(snapshot.last_motion, MotionCommand::Forward);
+  EXPECT_EQ(snapshot.last_cleaner, CleanerCommand::On);
+  EXPECT_EQ(fixture.log.calls,
+            (std::vector<std::string>{"motor.forward", "cleaner.on"}));
+}
+
 TEST(RvcControllerTest, CompatibilityUpdateStillMapsSensorInput) {
   ControllerFixture fixture;
   SensorInput input;
@@ -266,6 +313,82 @@ TEST(RvcControllerTest, CompatibilityUpdateStillMapsSensorInput) {
 
   EXPECT_EQ(command.motion, MotionCommand::TurnRight);
   EXPECT_EQ(command.cleaner, CleanerCommand::PowerUp);
+}
+
+TEST(RvcControllerTest, CompatibilityUpdateCoversAllBasicMotionChoices) {
+  ControllerFixture fixture;
+
+  SensorInput clear_path;
+  ControlCommand command = fixture.controller.Update(clear_path);
+  EXPECT_EQ(command.motion, MotionCommand::Forward);
+  EXPECT_EQ(command.cleaner, CleanerCommand::On);
+
+  SensorInput left_clear;
+  left_clear.front_obstacle = true;
+  command = fixture.controller.Update(left_clear);
+  EXPECT_EQ(command.motion, MotionCommand::TurnLeft);
+  EXPECT_EQ(command.cleaner, CleanerCommand::On);
+
+  SensorInput both_sides_blocked;
+  both_sides_blocked.front_obstacle = true;
+  both_sides_blocked.left_obstacle = true;
+  both_sides_blocked.right_obstacle = true;
+  command = fixture.controller.Update(both_sides_blocked);
+  EXPECT_EQ(command.motion, MotionCommand::Backward);
+  EXPECT_EQ(command.cleaner, CleanerCommand::On);
+}
+
+TEST(RvcControllerTest, ControllerStateAccessorsAndMutators) {
+  ControllerState state;
+
+  EXPECT_TRUE(state.IsPoweredOff());
+  EXPECT_FALSE(state.IsPoweredOn());
+  EXPECT_FALSE(state.IsAvoidingObstacle());
+  EXPECT_EQ(state.CurrentPowerState(), PowerState::Off);
+  EXPECT_EQ(state.CurrentCleaningState(), CleaningState::PoweredOff);
+
+  state.SetPowerState(PowerState::On);
+  state.SetCleaningState(CleaningState::AvoidingObstacle);
+
+  EXPECT_TRUE(state.IsPoweredOn());
+  EXPECT_FALSE(state.IsPoweredOff());
+  EXPECT_TRUE(state.IsAvoidingObstacle());
+  EXPECT_EQ(state.CurrentPowerState(), PowerState::On);
+  EXPECT_EQ(state.CurrentCleaningState(), CleaningState::AvoidingObstacle);
+}
+
+TEST(RvcControllerTest, ObstacleAvoidancePolicySelectsLeftFirstThenRightThenBackward) {
+  ObstacleAvoidancePolicy policy;
+
+  EXPECT_EQ(policy.SelectMotion(false, false), MotionCommand::TurnLeft);
+  EXPECT_EQ(policy.SelectMotion(false, true), MotionCommand::TurnLeft);
+  EXPECT_EQ(policy.SelectMotion(true, false), MotionCommand::TurnRight);
+  EXPECT_EQ(policy.SelectMotion(true, true), MotionCommand::Backward);
+}
+
+TEST(RvcControllerTest, ToStringCoversAllEnumValues) {
+  EXPECT_EQ(ToString(PowerState::Off), "Off");
+  EXPECT_EQ(ToString(PowerState::On), "On");
+  EXPECT_EQ(ToString(static_cast<PowerState>(99)), "Unknown");
+
+  EXPECT_EQ(ToString(CleaningState::PoweredOff), "PoweredOff");
+  EXPECT_EQ(ToString(CleaningState::CheckingFront), "CheckingFront");
+  EXPECT_EQ(ToString(CleaningState::CleaningForward), "CleaningForward");
+  EXPECT_EQ(ToString(CleaningState::PowerUpCleaning), "PowerUpCleaning");
+  EXPECT_EQ(ToString(CleaningState::AvoidingObstacle), "AvoidingObstacle");
+  EXPECT_EQ(ToString(static_cast<CleaningState>(99)), "Unknown");
+
+  EXPECT_EQ(ToString(MotionCommand::Stop), "Stop");
+  EXPECT_EQ(ToString(MotionCommand::Forward), "Forward");
+  EXPECT_EQ(ToString(MotionCommand::Backward), "Backward");
+  EXPECT_EQ(ToString(MotionCommand::TurnLeft), "TurnLeft");
+  EXPECT_EQ(ToString(MotionCommand::TurnRight), "TurnRight");
+  EXPECT_EQ(ToString(static_cast<MotionCommand>(99)), "Unknown");
+
+  EXPECT_EQ(ToString(CleanerCommand::Off), "Off");
+  EXPECT_EQ(ToString(CleanerCommand::On), "On");
+  EXPECT_EQ(ToString(CleanerCommand::PowerUp), "PowerUp");
+  EXPECT_EQ(ToString(static_cast<CleanerCommand>(99)), "Unknown");
 }
 
 }  // namespace

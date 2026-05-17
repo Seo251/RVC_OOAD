@@ -6,19 +6,25 @@ participant "rvc_controller" as Controller
 participant "Front Sensor" as FrontSensor
 participant Motor
 participant Cleaner
+participant Timer
 
 == Start from power off ==
-User -> Controller: pressPowerButton()
-Controller -> Controller: setPowerState(On)
-Controller -> FrontSensor: isObstacleDetected()
-FrontSensor --> Controller: false
-Controller -> Motor: forward()
-Controller -> Cleaner: turnOn()
+User -> Controller: PressPowerButton()
+Controller -> FrontSensor: RequestFrontCheck()
+
+alt front path is clear
+  FrontSensor -> Controller: FrontPathClear()
+  Controller -> Motor: Forward()
+  Controller -> Cleaner: TurnOn()
+else front obstacle is detected
+  FrontSensor -> Controller: FrontObstacleDetected()
+  Controller -> Timer: CancelPowerUpTimer()
+  Controller -> Cleaner: TurnOff()
+end
 
 == Stop while power on ==
-User -> Controller: pressPowerButton()
-Controller -> Controller: cancelActiveProcess()
-Controller -> Motor: stop()
-Controller -> Cleaner: turnOff()
-Controller -> Controller: setPowerState(Off)
+User -> Controller: PressPowerButton()
+Controller -> Timer: CancelPowerUpTimer()
+Controller -> Motor: Stop()
+Controller -> Cleaner: TurnOff()
 @enduml

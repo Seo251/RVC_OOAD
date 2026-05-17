@@ -4,63 +4,83 @@ title OOD Class Diagram - RVC Controller
 skinparam classAttributeIconSize 0
 
 class RvcController {
-  +pressPowerButton()
-  +frontObstacleDetected()
-  +frontPathClear()
-  +sideSensorUpdated(leftBlocked, rightBlocked)
-  +dustDetected()
-  +powerUpTimerExpired()
-  +motionCompleted(motion)
+  +RvcController(motor, cleaner, timer, frontSensor, sideSensor)
+  +PressPowerButton()
+  +FrontObstacleDetected()
+  +FrontPathClear()
+  +SideSensorUpdated(leftBlocked, rightBlocked)
+  +DustDetected()
+  +PowerUpTimerExpired()
+  +MotionCompleted(motion)
+  +Snapshot(): ControllerSnapshot
+  +Update(input): ControlCommand
+  -SetLastMotion(motion)
+  -SetLastCleaner(cleaner)
+  -ResumeForwardCleaning()
+  -PowerOffSafely()
 }
 
 class ControllerState {
-  -powerState: PowerState
-  -cleaningState: CleaningState
-  +isPoweredOn()
-  +isPoweredOff()
-  +isAvoidingObstacle()
-  +currentCleaningState()
-  +setPowerState(state)
-  +setCleaningState(state)
+  -power_state_: PowerState
+  -cleaning_state_: CleaningState
+  +IsPoweredOn(): bool
+  +IsPoweredOff(): bool
+  +IsAvoidingObstacle(): bool
+  +CurrentCleaningState(): CleaningState
+  +CurrentPowerState(): PowerState
+  +SetPowerState(state)
+  +SetCleaningState(state)
 }
 
 class ObstacleAvoidancePolicy {
-  +selectMotion(leftBlocked, rightBlocked): MotionCommand
+  +SelectMotion(leftBlocked, rightBlocked): MotionCommand
 }
 
 interface MotorPort {
-  +forward()
-  +backward()
-  +turnLeft()
-  +turnRight()
-  +stop()
+  +Forward()
+  +Backward()
+  +TurnLeft()
+  +TurnRight()
+  +Stop()
 }
 
 interface CleanerPort {
-  +turnOn()
-  +turnOff()
-  +powerUp()
+  +TurnOn()
+  +TurnOff()
+  +PowerUp()
 }
 
 interface FrontSensorPort {
-  +requestFrontCheck()
+  +RequestFrontCheck()
 }
 
 interface SideSensorPort {
-  +requestSideCheck()
+  +RequestSideCheck()
 }
 
-interface PowerUpTimerPort {
-  +start(duration)
-  +restart(duration)
-  +cancel()
+interface TimerPort {
+  +StartPowerUpTimer(seconds)
+  +RestartPowerUpTimer(seconds)
+  +CancelPowerUpTimer()
 }
 
-class SensorSnapshot {
-  +frontBlocked: bool
-  +leftBlocked: bool
-  +rightBlocked: bool
-  +dustDetected: bool
+class SensorInput {
+  +front_obstacle: bool
+  +left_obstacle: bool
+  +right_obstacle: bool
+  +dust_detected: bool
+}
+
+class ControlCommand {
+  +motion: MotionCommand
+  +cleaner: CleanerCommand
+}
+
+class ControllerSnapshot {
+  +power_state: PowerState
+  +cleaning_state: CleaningState
+  +last_motion: MotionCommand
+  +last_cleaner: CleanerCommand
 }
 
 enum PowerState {
@@ -96,19 +116,29 @@ RvcController --> MotorPort
 RvcController --> CleanerPort
 RvcController --> FrontSensorPort
 RvcController --> SideSensorPort
-RvcController --> PowerUpTimerPort
-RvcController ..> SensorSnapshot
+RvcController --> TimerPort
+RvcController ..> SensorInput
+RvcController ..> ControlCommand
+RvcController ..> ControllerSnapshot
 
 ControllerState --> PowerState
 ControllerState --> CleaningState
 ObstacleAvoidancePolicy --> MotionCommand
 MotorPort --> MotionCommand
 CleanerPort --> CleanerCommand
+ControlCommand --> MotionCommand
+ControlCommand --> CleanerCommand
+ControllerSnapshot --> PowerState
+ControllerSnapshot --> CleaningState
+ControllerSnapshot --> MotionCommand
+ControllerSnapshot --> CleanerCommand
 
 note right of RvcController
 Only this class receives system operations.
-It coordinates state, policy, timer,
-and actuator ports.
+The seven public event methods are the
+system boundary operations. Snapshot()
+and Update() are implementation helpers
+used for state reporting and legacy tests.
 end note
 
 note bottom of ObstacleAvoidancePolicy

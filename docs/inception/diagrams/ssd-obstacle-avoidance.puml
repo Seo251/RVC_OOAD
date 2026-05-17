@@ -2,42 +2,42 @@
 title SSD - Obstacle Avoidance
 
 actor "Front Sensor" as FrontSensor
+actor "Side Sensors" as SideSensors
+actor "Motor Completion" as MotorEvent
 participant "rvc_controller" as Controller
-participant "Left Sensor" as LeftSensor
-participant "Right Sensor" as RightSensor
 participant Motor
 participant Cleaner
+participant Timer
 
-FrontSensor -> Controller: frontObstacleDetected()
-Controller -> Cleaner: turnOff()
-Controller -> LeftSensor: isObstacleDetected()
+FrontSensor -> Controller: FrontObstacleDetected()
+Controller -> Timer: CancelPowerUpTimer()
+Controller -> Cleaner: TurnOff()
+Controller -> SideSensors: RequestSideCheck()
 
 alt left side is clear
-  LeftSensor --> Controller: false
-  Controller -> Motor: turnLeft()
-else left side is blocked
-  LeftSensor --> Controller: true
-  Controller -> RightSensor: isObstacleDetected()
-  alt right side is clear
-    RightSensor --> Controller: false
-    Controller -> Motor: turnRight()
-  else both sides are blocked
-    RightSensor --> Controller: true
-    loop until left or right side is clear
-      Controller -> Motor: backward()
-      Controller -> LeftSensor: isObstacleDetected()
-      LeftSensor --> Controller: leftBlocked
-      Controller -> RightSensor: isObstacleDetected()
-      RightSensor --> Controller: rightBlocked
-    end
+  SideSensors -> Controller: SideSensorUpdated(false, rightBlocked)
+  Controller -> Motor: TurnLeft()
+else left blocked and right clear
+  SideSensors -> Controller: SideSensorUpdated(true, false)
+  Controller -> Motor: TurnRight()
+else both sides are blocked
+  SideSensors -> Controller: SideSensorUpdated(true, true)
+  Controller -> Motor: Backward()
+  loop until left or right side is clear
+    MotorEvent -> Controller: MotionCompleted(Backward)
+    Controller -> SideSensors: RequestSideCheck()
+    SideSensors -> Controller: SideSensorUpdated(leftBlocked, rightBlocked)
     alt left side becomes clear
-      Controller -> Motor: turnLeft()
+      Controller -> Motor: TurnLeft()
     else right side becomes clear
-      Controller -> Motor: turnRight()
+      Controller -> Motor: TurnRight()
+    else both still blocked
+      Controller -> Motor: Backward()
     end
   end
 end
 
-Controller -> Motor: forward()
-Controller -> Cleaner: turnOn()
+MotorEvent -> Controller: MotionCompleted(TurnLeft or TurnRight)
+Controller -> Motor: Forward()
+Controller -> Cleaner: TurnOn()
 @enduml

@@ -4,29 +4,33 @@ title SSD - Dust Power-Up Cleaning
 actor "Dust Sensor" as DustSensor
 actor "Front Sensor" as FrontSensor
 participant "rvc_controller" as Controller
+participant Motor
 participant Cleaner
 participant Timer
 
-DustSensor -> Controller: dustDetected()
-Controller -> Cleaner: powerUp()
-Controller -> Timer: start(3 seconds)
+DustSensor -> Controller: DustDetected()
+Controller -> Cleaner: PowerUp()
+Controller -> Timer: StartPowerUpTimer(3)
 note right of Controller
   Motor keeps Forward.
   The robot keeps moving while
   power-up cleaning is active.
 end note
 
+FrontSensor -> Controller: FrontPathClear()
+Controller -> Motor: Forward()
+
 alt no event during 3 seconds
-  Timer --> Controller: timeout()
-  Controller -> Cleaner: turnOn()
+  Timer -> Controller: PowerUpTimerExpired()
+  Controller -> Cleaner: TurnOn()
 else dust detected again during power-up
-  DustSensor -> Controller: dustDetected()
-  Controller -> Timer: discard previous and start(3 seconds)
-  Controller -> Cleaner: powerUp()
+  DustSensor -> Controller: DustDetected()
+  Controller -> Timer: RestartPowerUpTimer(3)
+  Controller -> Cleaner: PowerUp()
 else front obstacle detected before timeout
-  FrontSensor -> Controller: frontObstacleDetected()
-  Controller -> Timer: cancel()
-  Controller -> Cleaner: turnOff()
-  Controller -> Controller: startObstacleAvoidance()
+  FrontSensor -> Controller: FrontObstacleDetected()
+  Controller -> Timer: CancelPowerUpTimer()
+  Controller -> Cleaner: TurnOff()
+  Controller -> Controller: enter AvoidingObstacle
 end
 @enduml
