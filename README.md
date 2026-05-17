@@ -76,40 +76,57 @@ The simulator uses left-click to toggle obstacles and right-click to toggle
 dust. It communicates with the C++ controller through line-delimited JSON over
 TCP.
 
-Simulator controls:
+### Autonomous behavior
+
+After `Power Button` is pressed the simulator drives the controller
+automatically. On every controller response the UI inspects the snapshot, then
+answers requests that the C++ controller raises (front/side sensor checks,
+power-up timer, motion completion) by reading the editable grid map. The result
+is a real-time animation: the robot moves forward through clean cells, switches
+to **PowerUpCleaning** (the robot turns orange-red and the status shows
+"BOOSTER UP CLEANING") when it enters a dust cell, and enters
+**AvoidingObstacle** (turns purple) when its front cell is blocked, choosing
+to turn left/right or back up based on the surrounding cells.
+
+You can keep editing the map while the robot is running - newly placed
+obstacles and dust will affect the next sensor check.
+
+### Buttons
 
 - `Connect`: connect to the C++ controller app.
 - Left-click a cell: toggle an obstacle.
 - Right-click a cell: toggle dust.
-- `Power Button`: send the power button event. When the controller enters
-  `CheckingFront`, the simulator automatically checks the front cell in the map
-  and sends either `Front Clear` or `Front Obstacle`.
-- `Front From Map`: manually re-check the current front cell from the map.
-- `Front Clear`: tell the controller that the front cell is clear.
-- `Front Obstacle`: tell the controller that the front cell is blocked.
-- `Left Clear`: send a side-sensor update where the left side is clear.
-- `Right Clear`: send a side-sensor update where the right side is clear.
-- `Both Blocked`: send a side-sensor update where both sides are blocked.
-- `Dust Detected`: send a dust detection event.
-- `Timer Expired`: simulate the 5-second cleaner power-up timer expiring.
-- `Motion Done`: tell the controller that the current turn/backward motion
-  completed.
-- `Save Map` / `Load Map`: save or load manually edited obstacle/dust maps.
+- `Power Button`: start (or stop) the autonomous cleaning loop.
+- `Front Clear` / `Front Obstacle`: manual sensor overrides for debugging.
+- `Left Clear` / `Right Clear` / `Both Blocked`: manual side-sensor overrides.
+- `Dust Detected`: manually inject a dust detection event.
+- `Timer Expired`: manually fire the 5-second cleaner power-up timer.
+- `Motion Done`: manually confirm the current turn/backward motion.
+- `Save Map` / `Load Map`: save or load obstacle/dust maps.
 
-The robot is drawn as a blue circle. The white arrow inside the robot shows the
-current front direction. Controller motion events update the simulator pose:
-`Forward` moves one cell forward, `Backward` moves one cell backward, and
-`TurnLeft`/`TurnRight` rotate the arrow.
+### Visualization
 
-Basic manual scenario:
+- Blue circle: cleaning forward.
+- Orange-red circle: PowerUpCleaning (booster up mode).
+- Purple circle: AvoidingObstacle.
+- Gray circle: powered off.
+- White arrow inside the circle: current heading.
+- Gold cell: dust. Dark gray cell: obstacle.
+
+Controller motion events drive the robot: `Forward` moves one cell forward,
+`Backward` moves one cell backward, and `TurnLeft`/`TurnRight` rotate the arrow.
+
+### Quick demo
 
 ```text
 1. Start rvc_controller_app.exe 5050.
 2. Start simulator_ui.py.
 3. Click Connect.
-4. Place or remove obstacles/dust on the grid.
-5. Click Power Button.
-6. Use Motion Done after a turn/backward command to finish the motion.
+4. Left-click cells to add a few obstacles. Right-click cells to drop dust in
+   the robot's expected path.
+5. Click Power Button - the robot should now drive forward by itself,
+   power-up clean any dust it crosses, and turn or back up around obstacles.
+6. Click Power Button again to stop the robot.
 ```
 
 ## Testing
