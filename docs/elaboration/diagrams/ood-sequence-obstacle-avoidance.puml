@@ -1,0 +1,54 @@
+@startuml
+title OOD Sequence - Obstacle Avoidance
+
+actor "Front Sensor" as FrontSensor
+actor "Side Sensors" as SideSensors
+actor MotorEvent
+actor User
+participant "RvcController" as Controller
+participant "ControllerState" as State
+participant "PowerUpTimerPort" as Timer
+participant "CleanerPort" as Cleaner
+participant "ObstacleAvoidancePolicy" as Policy
+participant "MotorPort" as Motor
+
+FrontSensor -> Controller: frontObstacleDetected()
+Controller -> State: isPoweredOn()
+State --> Controller: true
+Controller -> Timer: cancel()
+Controller -> Cleaner: turnOff()
+Controller -> State: setCleaningState(AvoidingObstacle)
+Controller -> SideSensors: requestSideCheck()
+
+SideSensors -> Controller: sideSensorUpdated(leftBlocked, rightBlocked)
+Controller -> State: isAvoidingObstacle()
+State --> Controller: true
+Controller -> Policy: selectMotion(leftBlocked, rightBlocked)
+
+alt left side is clear
+  Policy --> Controller: TurnLeft
+  Controller -> Motor: turnLeft()
+else left blocked and right clear
+  Policy --> Controller: TurnRight
+  Controller -> Motor: turnRight()
+else both sides are blocked
+  Policy --> Controller: Backward
+  Controller -> Motor: backward()
+  MotorEvent -> Controller: motionCompleted(Backward)
+  Controller -> SideSensors: requestSideCheck()
+end
+
+alt turn motion completed
+  MotorEvent -> Controller: motionCompleted(TurnLeft or TurnRight)
+  Controller -> State: setCleaningState(CleaningForward)
+  Controller -> Motor: forward()
+  Controller -> Cleaner: turnOn()
+else user powers off during avoidance
+  User -> Controller: pressPowerButton()
+  Controller -> Timer: cancel()
+  Controller -> Motor: stop()
+  Controller -> Cleaner: turnOff()
+  Controller -> State: setCleaningState(PoweredOff)
+  Controller -> State: setPowerState(Off)
+end
+@enduml

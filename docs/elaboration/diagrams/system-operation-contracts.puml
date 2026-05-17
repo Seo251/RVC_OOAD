@@ -1,0 +1,46 @@
+@startuml
+title System Operations - RVC Controller Boundary
+
+left to right direction
+skinparam packageStyle rectangle
+
+actor User
+actor "Front Sensor" as FrontSensor
+actor "Side Sensors" as SideSensors
+actor "Dust Sensor" as DustSensor
+actor Timer
+actor Motor
+
+rectangle "rvc_controller boundary" {
+  usecase "pressPowerButton()" as OpPower
+  usecase "frontObstacleDetected()" as OpFrontObstacle
+  usecase "frontPathClear()" as OpFrontClear
+  usecase "sideSensorUpdated(leftBlocked, rightBlocked)" as OpSide
+  usecase "dustDetected()" as OpDust
+  usecase "powerUpTimerExpired()" as OpTimer
+  usecase "motionCompleted(motion)" as OpMotion
+}
+
+User --> OpPower
+FrontSensor --> OpFrontObstacle
+FrontSensor --> OpFrontClear
+SideSensors --> OpSide
+DustSensor --> OpDust
+Timer --> OpTimer
+Motor --> OpMotion
+
+note right of OpPower
+Highest priority when powered on:
+stop motor, cleaner off, cancel timer.
+end note
+
+note bottom of OpFrontObstacle
+Higher priority than dust and timer.
+Enters obstacle avoidance immediately.
+end note
+
+note bottom of OpDust
+Ignored during obstacle avoidance.
+Resets timer during active power-up.
+end note
+@enduml

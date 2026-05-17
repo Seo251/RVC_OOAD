@@ -1,0 +1,120 @@
+@startuml
+title OOD Class Diagram - RVC Controller
+
+skinparam classAttributeIconSize 0
+
+class RvcController {
+  +pressPowerButton()
+  +frontObstacleDetected()
+  +frontPathClear()
+  +sideSensorUpdated(leftBlocked, rightBlocked)
+  +dustDetected()
+  +powerUpTimerExpired()
+  +motionCompleted(motion)
+}
+
+class ControllerState {
+  -powerState: PowerState
+  -cleaningState: CleaningState
+  +isPoweredOn()
+  +isPoweredOff()
+  +isAvoidingObstacle()
+  +currentCleaningState()
+  +setPowerState(state)
+  +setCleaningState(state)
+}
+
+class ObstacleAvoidancePolicy {
+  +selectMotion(leftBlocked, rightBlocked): MotionCommand
+}
+
+interface MotorPort {
+  +forward()
+  +backward()
+  +turnLeft()
+  +turnRight()
+  +stop()
+}
+
+interface CleanerPort {
+  +turnOn()
+  +turnOff()
+  +powerUp()
+}
+
+interface FrontSensorPort {
+  +requestFrontCheck()
+}
+
+interface SideSensorPort {
+  +requestSideCheck()
+}
+
+interface PowerUpTimerPort {
+  +start(duration)
+  +restart(duration)
+  +cancel()
+}
+
+class SensorSnapshot {
+  +frontBlocked: bool
+  +leftBlocked: bool
+  +rightBlocked: bool
+  +dustDetected: bool
+}
+
+enum PowerState {
+  Off
+  On
+}
+
+enum CleaningState {
+  PoweredOff
+  CheckingFront
+  CleaningForward
+  PowerUpCleaning
+  AvoidingObstacle
+}
+
+enum MotionCommand {
+  Stop
+  Forward
+  Backward
+  TurnLeft
+  TurnRight
+}
+
+enum CleanerCommand {
+  Off
+  On
+  PowerUp
+}
+
+RvcController *-- ControllerState
+RvcController --> ObstacleAvoidancePolicy
+RvcController --> MotorPort
+RvcController --> CleanerPort
+RvcController --> FrontSensorPort
+RvcController --> SideSensorPort
+RvcController --> PowerUpTimerPort
+RvcController ..> SensorSnapshot
+
+ControllerState --> PowerState
+ControllerState --> CleaningState
+ObstacleAvoidancePolicy --> MotionCommand
+MotorPort --> MotionCommand
+CleanerPort --> CleanerCommand
+
+note right of RvcController
+Only this class receives system operations.
+It coordinates state, policy, timer,
+and actuator ports.
+end note
+
+note bottom of ObstacleAvoidancePolicy
+Left-first rule:
+left clear -> TurnLeft
+right clear -> TurnRight
+both blocked -> Backward
+end note
+@enduml

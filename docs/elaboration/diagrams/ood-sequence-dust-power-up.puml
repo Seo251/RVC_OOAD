@@ -1,0 +1,55 @@
+@startuml
+title OOD Sequence - Dust Power-Up and Interrupts
+
+actor "Dust Sensor" as DustSensor
+actor "Front Sensor" as FrontSensor
+actor TimerEvent
+participant "RvcController" as Controller
+participant "ControllerState" as State
+participant "CleanerPort" as Cleaner
+participant "PowerUpTimerPort" as Timer
+participant "MotorPort" as Motor
+
+== Dust detected during forward cleaning ==
+DustSensor -> Controller: dustDetected()
+Controller -> State: currentCleaningState()
+State --> Controller: CleaningForward
+Controller -> Cleaner: powerUp()
+Controller -> Timer: start(5 seconds)
+Controller -> State: setCleaningState(PowerUpCleaning)
+
+== Dust detected again during power-up ==
+DustSensor -> Controller: dustDetected()
+Controller -> State: currentCleaningState()
+State --> Controller: PowerUpCleaning
+Controller -> Timer: restart(5 seconds)
+Controller -> Cleaner: powerUp()
+
+alt timer expires without obstacle
+  TimerEvent -> Controller: powerUpTimerExpired()
+  Controller -> State: currentCleaningState()
+  State --> Controller: PowerUpCleaning
+  Controller -> Cleaner: turnOn()
+  Controller -> State: setCleaningState(CleaningForward)
+else front obstacle interrupts power-up
+  FrontSensor -> Controller: frontObstacleDetected()
+  Controller -> Timer: cancel()
+  Controller -> Cleaner: turnOff()
+  Controller -> State: setCleaningState(AvoidingObstacle)
+else dust detected during avoidance
+  DustSensor -> Controller: dustDetected()
+  Controller -> State: currentCleaningState()
+  State --> Controller: AvoidingObstacle
+  Controller -> Controller: ignore event
+  Controller -> Cleaner: keepOff()
+end
+
+== Power off during power-up ==
+actor User
+User -> Controller: pressPowerButton()
+Controller -> Timer: cancel()
+Controller -> Motor: stop()
+Controller -> Cleaner: turnOff()
+Controller -> State: setCleaningState(PoweredOff)
+Controller -> State: setPowerState(Off)
+@enduml
