@@ -211,11 +211,16 @@ class SimulatorUi:
     # ------------------------------------------------------------------
 
     def schedule_tick(self, delay: int = TICK_MS) -> None:
-        # Only cancel the pending tick. The booster timer (power_up_after_id)
-        # runs on its own schedule (POWER_UP_MS) and must NOT be reset every
-        # time the drive loop reschedules itself, otherwise the booster would
-        # never expire while the robot is moving.
-        self.cancel_tick()
+        # NFR-011: the motor tick cadence must NOT be reset by cleaner-only
+        # events. Concretely, when fire_power_up_timer() sends
+        # powerUpTimerExpired (a cleaner state change), the resulting send()
+        # would otherwise cancel the already-queued motor tick and push the
+        # robot's next forward step out by another TICK_MS, causing a visible
+        # pause whenever the booster expires. We keep the existing schedule
+        # if a tick is already pending; the in-flight tick will reschedule
+        # itself when it runs.
+        if self.auto_drive_after_id is not None:
+            return
         self.auto_drive_after_id = self.root.after(delay, self.tick)
 
     def cancel_tick(self) -> None:
