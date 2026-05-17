@@ -61,9 +61,9 @@ jobs:
             --enable=all \
             --inconclusive \
             --std=c++17 \
-            --project="${BUILD_DIR}/compile_commands.json" \
             --suppress=missingIncludeSystem \
-            --error-exitcode=1
+            --error-exitcode=1 \
+            include src tests
 
       - name: Run clang-tidy
         run: |
@@ -74,12 +74,23 @@ jobs:
           import sys
 
           compile_commands = pathlib.Path("build/compile_commands.json")
+          repo_root = pathlib.Path.cwd().resolve()
           commands = json.loads(compile_commands.read_text(encoding="utf-8"))
-          sources = sorted({
-              entry["file"]
-              for entry in commands
-              if pathlib.Path(entry["file"]).suffix in {".c", ".cc", ".cpp", ".cxx"}
-          })
+          allowed_dirs = {"src", "tests"}
+          sources = []
+
+          for entry in commands:
+              source = pathlib.Path(entry["file"]).resolve()
+              if source.suffix not in {".c", ".cc", ".cpp", ".cxx"}:
+                  continue
+              try:
+                  relative = source.relative_to(repo_root)
+              except ValueError:
+                  continue
+              if relative.parts and relative.parts[0] in allowed_dirs:
+                  sources.append(str(source))
+
+          sources = sorted(set(sources))
 
           if not sources:
               print("No C/C++ source files found in compile_commands.json.")
