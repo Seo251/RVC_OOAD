@@ -17,7 +17,7 @@ rectangle "rvc_controller" {
   usecase "Turn Left" as UC_TurnLeft
   usecase "Turn Right" as UC_TurnRight
   usecase "Move Backward Until Clear" as UC_Backward
-  usecase "Power Up Cleaning For 5 Seconds" as UC_Dust
+  usecase "Power Up Cleaning For 3 Seconds" as UC_Dust
   usecase "Restore Normal Cleaning Power" as UC_Restore
 }
 

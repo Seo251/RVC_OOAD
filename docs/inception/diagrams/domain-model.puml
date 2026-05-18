@@ -36,23 +36,24 @@ class ObstacleAvoidancePolicy {
 }
 
 class Motor {
-  moveForward()
-  moveBackward()
-  turnLeft()
-  turnRight()
-  stop()
+  Forward()
+  Backward()
+  TurnLeft()
+  TurnRight()
+  Stop()
 }
 
 class Cleaner {
-  turnOn()
-  turnOff()
-  powerUp()
+  TurnOn()
+  TurnOff()
+  PowerUp()
 }
 
 class PowerUpTimer {
-  start(duration)
-  cancel()
-  timeout()
+  StartPowerUpTimer(duration)
+  RestartPowerUpTimer(duration)
+  CancelPowerUpTimer()
+  PowerUpTimerExpired()
 }
 
 class ControlCommand {
@@ -76,8 +77,8 @@ enum DirectionCommand {
   Stop
   Forward
   Backward
-  Left
-  Right
+  TurnLeft
+  TurnRight
 }
 
 enum CleanCommand {

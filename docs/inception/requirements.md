@@ -26,7 +26,7 @@
 | FR-016 | 흡입력 증가 후 3초가 지나면 `rvc_controller`는 cleaner의 흡입력을 정상화해야 하며, 이 변경은 motor의 전진 동작에 영향을 주지 않아야 한다. |
 | FR-017 | 흡입력 증가 중 전방 장애물이 감지되면 `rvc_controller`는 증가된 시간을 저장하지 않고 즉시 cleaner를 끄고 장애물 회피 프로세스를 시작해야 한다. |
 | FR-021 | 흡입력 증가 중 다시 먼지가 감지되면 `rvc_controller`는 이전 타이머를 폐기하고 그 시점부터 다시 3초 타이머를 시작해야 한다. 이 재시작은 motor 동작에 영향을 주지 않는다. |
-| FR-018 | `rvc_controller`는 motor 명령을 `Forward`, `Backward`, `Left`, `Right`, `Stop` 중 하나로 출력해야 한다. |
+| FR-018 | `rvc_controller`는 motor 명령을 `Forward`, `Backward`, `TurnLeft`, `TurnRight`, `Stop` 중 하나로 출력해야 한다. |
 | FR-019 | `rvc_controller`는 cleaner 명령을 `Off`, `On`, `PowerUp` 중 하나로 출력해야 한다. |
 | FR-020 | `rvc_controller`는 전방 센서, 좌측 센서, 우측 센서, 먼지 센서, 사용자 버튼 입력을 처리해야 한다. |
 
@@ -44,7 +44,7 @@
 | NFR-008 | 전원 상태, 청소 상태, 회피 상태, 흡입력 증가 상태는 명확한 상태 모델로 표현되어야 한다. |
 | NFR-009 | 잘못된 센서 조합이나 반복 입력에도 controller는 정의되지 않은 motor/cleaner 명령을 출력하지 않아야 한다. |
 | NFR-010 | 본 Inception 범위에서는 모터 각도, 속도, 흡입력 세기 등 하드웨어 상세 파라미터를 결정하지 않는다. |
-| NFR-011 | Motor 출력(`Forward`, `Backward`, `Left`, `Right`, `Stop`)과 Cleaner 출력(`Off`, `On`, `PowerUp`)은 서로 독립적으로 결정되어야 한다. Motor 상태 변화는 Cleaner 상태에 영향을 줄 수 있으나(예: 전방 장애물 → cleaner off, 전진 시작 → cleaner on), 반대로 Cleaner 상태 변화는 Motor 상태나 진행을 변경하지 않아야 한다(예: 먼지 감지로 cleaner가 `PowerUp`이 되어도 motor의 전진은 멈추거나 느려지지 않는다). |
+| NFR-011 | Motor 출력(`Forward`, `Backward`, `TurnLeft`, `TurnRight`, `Stop`)과 Cleaner 출력(`Off`, `On`, `PowerUp`)은 서로 독립적으로 결정되어야 한다. Motor 상태 변화는 Cleaner 상태에 영향을 줄 수 있으나(예: 전방 장애물 → cleaner off, 전진 시작 → cleaner on), 반대로 Cleaner 상태 변화는 Motor 상태나 진행을 변경하지 않아야 한다(예: 먼지 감지로 cleaner가 `PowerUp`이 되어도 motor의 전진은 멈추거나 느려지지 않는다). |
 
 ## Use Cases
 
@@ -80,8 +80,8 @@
 | Trigger | 전원이 켜져 있거나 청소 중일 때 전방 장애물이 감지된다. |
 | Preconditions | `rvc_controller` 전원이 켜져 있다. |
 | Postconditions | 장애물 회피 후 전진 청소 상태로 복귀한다. |
-| Main Success Scenario | 1. Front Sensor가 전방 장애물을 감지한다.<br>2. `rvc_controller`가 Cleaner에 `Off` 명령을 보낸다.<br>3. `rvc_controller`가 Left Sensor를 확인한다.<br>4. 좌측 장애물이 없다.<br>5. `rvc_controller`가 Motor에 `Left` 명령을 보낸다.<br>6. 회피가 종료된다.<br>7. `rvc_controller`가 Motor에 `Forward` 명령을 보낸다.<br>8. `rvc_controller`가 Cleaner에 `On` 명령을 보낸다. |
-| Extensions | 4a. 좌측 장애물이 있으면 Right Sensor를 확인한다.<br>4a1. 우측 장애물이 없으면 Motor에 `Right` 명령을 보낸 뒤 전진 청소로 복귀한다.<br>4a2. 우측 장애물도 있으면 좌측 또는 우측 중 하나가 비어 있을 때까지 Motor에 `Backward` 명령을 보낸다.<br>4a3. 빈 방향이 감지되면 해당 방향으로 회전하고 전진 청소로 복귀한다. |
+| Main Success Scenario | 1. Front Sensor가 전방 장애물을 감지한다.<br>2. `rvc_controller`가 Cleaner에 `Off` 명령을 보낸다.<br>3. `rvc_controller`가 Left Sensor를 확인한다.<br>4. 좌측 장애물이 없다.<br>5. `rvc_controller`가 Motor에 `TurnLeft` 명령을 보낸다.<br>6. 회피가 종료된다.<br>7. `rvc_controller`가 Motor에 `Forward` 명령을 보낸다.<br>8. `rvc_controller`가 Cleaner에 `On` 명령을 보낸다. |
+| Extensions | 4a. 좌측 장애물이 있으면 Right Sensor를 확인한다.<br>4a1. 우측 장애물이 없으면 Motor에 `TurnRight` 명령을 보낸 뒤 전진 청소로 복귀한다.<br>4a2. 우측 장애물도 있으면 좌측 또는 우측 중 하나가 비어 있을 때까지 Motor에 `Backward` 명령을 보낸다.<br>4a3. 빈 방향이 감지되면 해당 방향으로 회전하고 전진 청소로 복귀한다. |
 
 ### UC-004 Power Up Cleaning On Dust
 
