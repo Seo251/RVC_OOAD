@@ -1,43 +1,50 @@
 @startuml
 title SSD - Obstacle Avoidance
 
+skinparam actorStyle awesome
+
+box "External Actors"
 actor "Front Sensor" as FrontSensor
 actor "Side Sensors" as SideSensors
 actor "Motor Completion" as MotorEvent
-participant "rvc_controller" as Controller
-participant Motor
-participant Cleaner
-participant Timer
+actor Motor
+actor Cleaner
+actor Timer
+end box
 
-FrontSensor -> Controller: FrontObstacleDetected()
-Controller -> Timer: CancelPowerUpTimer()
-Controller -> Cleaner: TurnOff()
-Controller -> SideSensors: RequestSideCheck()
+box "System Boundary"
+participant ":System" as System
+end box
+
+FrontSensor -> System: FrontObstacleDetected()
+System -> Timer: CancelPowerUpTimer()
+System -> Cleaner: TurnOff()
+System -> SideSensors: RequestSideCheck()
 
 alt left side is clear
-  SideSensors -> Controller: SideSensorUpdated(false, rightBlocked)
-  Controller -> Motor: TurnLeft()
+  SideSensors -> System: SideSensorUpdated(false, rightBlocked)
+  System -> Motor: TurnLeft()
 else left blocked and right clear
-  SideSensors -> Controller: SideSensorUpdated(true, false)
-  Controller -> Motor: TurnRight()
+  SideSensors -> System: SideSensorUpdated(true, false)
+  System -> Motor: TurnRight()
 else both sides are blocked
-  SideSensors -> Controller: SideSensorUpdated(true, true)
-  Controller -> Motor: Backward()
+  SideSensors -> System: SideSensorUpdated(true, true)
+  System -> Motor: Backward()
   loop until left or right side is clear
-    MotorEvent -> Controller: MotionCompleted(Backward)
-    Controller -> SideSensors: RequestSideCheck()
-    SideSensors -> Controller: SideSensorUpdated(leftBlocked, rightBlocked)
+    MotorEvent -> System: MotionCompleted(Backward)
+    System -> SideSensors: RequestSideCheck()
+    SideSensors -> System: SideSensorUpdated(leftBlocked, rightBlocked)
     alt left side becomes clear
-      Controller -> Motor: TurnLeft()
+      System -> Motor: TurnLeft()
     else right side becomes clear
-      Controller -> Motor: TurnRight()
+      System -> Motor: TurnRight()
     else both still blocked
-      Controller -> Motor: Backward()
+      System -> Motor: Backward()
     end
   end
 end
 
-MotorEvent -> Controller: MotionCompleted(TurnLeft or TurnRight)
-Controller -> Motor: Forward()
-Controller -> Cleaner: TurnOn()
+MotorEvent -> System: MotionCompleted(TurnLeft or TurnRight)
+System -> Motor: Forward()
+System -> Cleaner: TurnOn()
 @enduml

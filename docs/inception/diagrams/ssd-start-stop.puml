@@ -1,30 +1,37 @@
 @startuml
 title SSD - Start and Stop Cleaning
 
+skinparam actorStyle awesome
+
+box "External Actors"
 actor User
-participant "rvc_controller" as Controller
-participant "Front Sensor" as FrontSensor
-participant Motor
-participant Cleaner
-participant Timer
+actor "Front Sensor" as FrontSensor
+actor Motor
+actor Cleaner
+actor Timer
+end box
+
+box "System Boundary"
+participant ":System" as System
+end box
 
 == Start from power off ==
-User -> Controller: PressPowerButton()
-Controller -> FrontSensor: RequestFrontCheck()
+User -> System: PressPowerButton()
+System -> FrontSensor: RequestFrontCheck()
 
 alt front path is clear
-  FrontSensor -> Controller: FrontPathClear()
-  Controller -> Motor: Forward()
-  Controller -> Cleaner: TurnOn()
+  FrontSensor -> System: FrontPathClear()
+  System -> Motor: Forward()
+  System -> Cleaner: TurnOn()
 else front obstacle is detected
-  FrontSensor -> Controller: FrontObstacleDetected()
-  Controller -> Timer: CancelPowerUpTimer()
-  Controller -> Cleaner: TurnOff()
+  FrontSensor -> System: FrontObstacleDetected()
+  System -> Timer: CancelPowerUpTimer()
+  System -> Cleaner: TurnOff()
 end
 
 == Stop while power on ==
-User -> Controller: PressPowerButton()
-Controller -> Timer: CancelPowerUpTimer()
-Controller -> Motor: Stop()
-Controller -> Cleaner: TurnOff()
+User -> System: PressPowerButton()
+System -> Timer: CancelPowerUpTimer()
+System -> Motor: Stop()
+System -> Cleaner: TurnOff()
 @enduml

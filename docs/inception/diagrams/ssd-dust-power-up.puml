@@ -1,36 +1,43 @@
 @startuml
 title SSD - Dust Power-Up Cleaning
 
+skinparam actorStyle awesome
+
+box "External Actors"
 actor "Dust Sensor" as DustSensor
 actor "Front Sensor" as FrontSensor
-participant "rvc_controller" as Controller
-participant Motor
-participant Cleaner
-participant Timer
+actor Motor
+actor Cleaner
+actor Timer
+end box
 
-DustSensor -> Controller: DustDetected()
-Controller -> Cleaner: PowerUp()
-Controller -> Timer: StartPowerUpTimer(3)
-note right of Controller
+box "System Boundary"
+participant ":System" as System
+end box
+
+DustSensor -> System: DustDetected()
+System -> Cleaner: PowerUp()
+System -> Timer: StartPowerUpTimer(3)
+note right of System
   Motor keeps Forward.
   The robot keeps moving while
   power-up cleaning is active.
 end note
 
-FrontSensor -> Controller: FrontPathClear()
-Controller -> Motor: Forward()
+FrontSensor -> System: FrontPathClear()
+System -> Motor: Forward()
 
 alt no event during 3 seconds
-  Timer -> Controller: PowerUpTimerExpired()
-  Controller -> Cleaner: TurnOn()
+  Timer -> System: PowerUpTimerExpired()
+  System -> Cleaner: TurnOn()
 else dust detected again during power-up
-  DustSensor -> Controller: DustDetected()
-  Controller -> Timer: RestartPowerUpTimer(3)
-  Controller -> Cleaner: PowerUp()
+  DustSensor -> System: DustDetected()
+  System -> Timer: RestartPowerUpTimer(3)
+  System -> Cleaner: PowerUp()
 else front obstacle detected before timeout
-  FrontSensor -> Controller: FrontObstacleDetected()
-  Controller -> Timer: CancelPowerUpTimer()
-  Controller -> Cleaner: TurnOff()
-  Controller -> Controller: enter AvoidingObstacle
+  FrontSensor -> System: FrontObstacleDetected()
+  System -> Timer: CancelPowerUpTimer()
+  System -> Cleaner: TurnOff()
+  System -> System: enter AvoidingObstacle
 end
 @enduml
