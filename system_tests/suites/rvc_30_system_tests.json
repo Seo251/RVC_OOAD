@@ -1,0 +1,357 @@
+{
+  "name": "RVC 30 scenario system test suite",
+  "maps": {
+    "map_01_straight_start": {"size": 8, "robot": [3, 3], "obstacles": [], "dust": []},
+    "map_02_power_stop": {"size": 8, "robot": [3, 3], "obstacles": [], "dust": []},
+    "map_03_start_front_blocked": {"size": 8, "robot": [3, 3], "obstacles": [[3, 2]], "dust": []},
+    "map_04_left_clear": {"size": 8, "robot": [3, 3], "obstacles": [[3, 2], [4, 3]], "dust": []},
+    "map_05_right_clear": {"size": 8, "robot": [3, 3], "obstacles": [[3, 2], [2, 3]], "dust": []},
+    "map_06_both_blocked_then_left": {"size": 8, "robot": [3, 3], "obstacles": [[3, 2], [2, 3], [4, 3], [4, 4]], "dust": []},
+    "map_07_both_blocked_then_right": {"size": 8, "robot": [3, 3], "obstacles": [[3, 2], [2, 3], [4, 3], [2, 4]], "dust": []},
+    "map_08_repeated_backward": {"size": 8, "robot": [3, 3], "obstacles": [[3, 2], [2, 3], [4, 3], [2, 4], [4, 4]], "dust": []},
+    "map_09_dust_start": {"size": 8, "robot": [3, 3], "obstacles": [], "dust": [[3, 2]]},
+    "map_10_dust_timeout": {"size": 8, "robot": [3, 3], "obstacles": [], "dust": [[3, 2]]},
+    "map_11_duplicate_dust": {"size": 8, "robot": [3, 3], "obstacles": [], "dust": [[3, 2], [3, 1]]},
+    "map_12_dust_then_obstacle": {"size": 8, "robot": [3, 3], "obstacles": [[3, 1]], "dust": [[3, 2]]},
+    "map_13_dust_while_checking": {"size": 8, "robot": [3, 3], "obstacles": [], "dust": [[3, 3]]},
+    "map_14_dust_while_avoiding": {"size": 8, "robot": [3, 3], "obstacles": [[3, 2]], "dust": [[3, 3]]},
+    "map_15_timer_without_powerup": {"size": 8, "robot": [3, 3], "obstacles": [], "dust": []},
+    "map_16_side_ignored": {"size": 8, "robot": [3, 3], "obstacles": [], "dust": []},
+    "map_17_motion_ignored": {"size": 8, "robot": [3, 3], "obstacles": [], "dust": []},
+    "map_18_front_clear_during_powerup": {"size": 8, "robot": [3, 3], "obstacles": [], "dust": [[3, 2]]},
+    "map_19_power_off_powerup": {"size": 8, "robot": [3, 3], "obstacles": [], "dust": [[3, 2]]},
+    "map_20_power_off_avoidance": {"size": 8, "robot": [3, 3], "obstacles": [[3, 2]], "dust": []},
+    "map_21_obstacle_while_cleaning": {"size": 8, "robot": [3, 3], "obstacles": [[3, 1]], "dust": []},
+    "map_22_obstacle_while_checking": {"size": 8, "robot": [3, 3], "obstacles": [[3, 2]], "dust": []},
+    "map_23_front_clear_from_avoidance": {"size": 8, "robot": [3, 3], "obstacles": [[3, 2]], "dust": []},
+    "map_24_stop_motion_ignored": {"size": 8, "robot": [3, 3], "obstacles": [[3, 2]], "dust": []},
+    "map_25_forward_motion_ignored": {"size": 8, "robot": [3, 3], "obstacles": [[3, 2]], "dust": []},
+    "map_26_both_clear_prefers_left": {"size": 8, "robot": [3, 3], "obstacles": [[3, 2]], "dust": []},
+    "map_27_repeated_front_clear": {"size": 8, "robot": [3, 3], "obstacles": [], "dust": []},
+    "map_28_timer_after_power_off": {"size": 8, "robot": [3, 3], "obstacles": [], "dust": [[3, 2]]},
+    "map_29_dust_restart_then_timeout": {"size": 8, "robot": [3, 3], "obstacles": [], "dust": [[3, 2], [3, 1]]},
+    "map_30_combined_obstacle_and_dust": {"size": 8, "robot": [3, 3], "obstacles": [[3, 2], [2, 3]], "dust": [[4, 3]]}
+  },
+  "cases": [
+    {
+      "name": "01 power on starts front check then forward cleaning",
+      "map": "map_01_straight_start",
+      "steps": [
+        {"op": "pressPowerButton", "expect": {"powerState": "On", "cleaningState": "CheckingFront", "lastMotion": "Stop", "lastCleaner": "Off"}},
+        {"op": "frontPathClear"}
+      ],
+      "expected": {"powerState": "On", "cleaningState": "CleaningForward", "lastMotion": "Forward", "lastCleaner": "On"}
+    },
+    {
+      "name": "02 power button stops active forward cleaning",
+      "map": "map_02_power_stop",
+      "steps": [
+        {"op": "pressPowerButton"},
+        {"op": "frontPathClear"},
+        {"op": "pressPowerButton"}
+      ],
+      "expected": {"powerState": "Off", "cleaningState": "PoweredOff", "lastMotion": "Stop", "lastCleaner": "Off"}
+    },
+    {
+      "name": "03 startup front obstacle enters avoidance",
+      "map": "map_03_start_front_blocked",
+      "steps": [
+        {"op": "pressPowerButton"},
+        {"op": "frontObstacleDetected"}
+      ],
+      "expected": {"powerState": "On", "cleaningState": "AvoidingObstacle", "lastMotion": "Stop", "lastCleaner": "Off"}
+    },
+    {
+      "name": "04 obstacle avoidance turns left when left is clear",
+      "map": "map_04_left_clear",
+      "steps": [
+        {"op": "pressPowerButton"},
+        {"op": "frontObstacleDetected"},
+        {"op": "sideSensorUpdated", "leftBlocked": false, "rightBlocked": true, "expect": {"cleaningState": "AvoidingObstacle", "lastMotion": "TurnLeft", "lastCleaner": "Off"}},
+        {"op": "motionCompleted", "motion": "TurnLeft"}
+      ],
+      "expected": {"powerState": "On", "cleaningState": "CleaningForward", "lastMotion": "Forward", "lastCleaner": "On"}
+    },
+    {
+      "name": "05 obstacle avoidance turns right when only right is clear",
+      "map": "map_05_right_clear",
+      "steps": [
+        {"op": "pressPowerButton"},
+        {"op": "frontObstacleDetected"},
+        {"op": "sideSensorUpdated", "leftBlocked": true, "rightBlocked": false, "expect": {"cleaningState": "AvoidingObstacle", "lastMotion": "TurnRight", "lastCleaner": "Off"}},
+        {"op": "motionCompleted", "motion": "TurnRight"}
+      ],
+      "expected": {"powerState": "On", "cleaningState": "CleaningForward", "lastMotion": "Forward", "lastCleaner": "On"}
+    },
+    {
+      "name": "06 both sides blocked backs up then turns left",
+      "map": "map_06_both_blocked_then_left",
+      "steps": [
+        {"op": "pressPowerButton"},
+        {"op": "frontObstacleDetected"},
+        {"op": "sideSensorUpdated", "leftBlocked": true, "rightBlocked": true, "expect": {"cleaningState": "AvoidingObstacle", "lastMotion": "Backward", "lastCleaner": "Off"}},
+        {"op": "motionCompleted", "motion": "Backward", "expect": {"cleaningState": "AvoidingObstacle", "lastMotion": "Backward", "lastCleaner": "Off"}},
+        {"op": "sideSensorUpdated", "leftBlocked": false, "rightBlocked": true},
+        {"op": "motionCompleted", "motion": "TurnLeft"}
+      ],
+      "expected": {"powerState": "On", "cleaningState": "CleaningForward", "lastMotion": "Forward", "lastCleaner": "On"}
+    },
+    {
+      "name": "07 both sides blocked backs up then turns right",
+      "map": "map_07_both_blocked_then_right",
+      "steps": [
+        {"op": "pressPowerButton"},
+        {"op": "frontObstacleDetected"},
+        {"op": "sideSensorUpdated", "leftBlocked": true, "rightBlocked": true},
+        {"op": "motionCompleted", "motion": "Backward"},
+        {"op": "sideSensorUpdated", "leftBlocked": true, "rightBlocked": false},
+        {"op": "motionCompleted", "motion": "TurnRight"}
+      ],
+      "expected": {"powerState": "On", "cleaningState": "CleaningForward", "lastMotion": "Forward", "lastCleaner": "On"}
+    },
+    {
+      "name": "08 repeated backward while both sides remain blocked",
+      "map": "map_08_repeated_backward",
+      "steps": [
+        {"op": "pressPowerButton"},
+        {"op": "frontObstacleDetected"},
+        {"op": "sideSensorUpdated", "leftBlocked": true, "rightBlocked": true},
+        {"op": "motionCompleted", "motion": "Backward"},
+        {"op": "sideSensorUpdated", "leftBlocked": true, "rightBlocked": true, "expect": {"cleaningState": "AvoidingObstacle", "lastMotion": "Backward", "lastCleaner": "Off"}},
+        {"op": "motionCompleted", "motion": "Backward"},
+        {"op": "sideSensorUpdated", "leftBlocked": false, "rightBlocked": true},
+        {"op": "motionCompleted", "motion": "TurnLeft"}
+      ],
+      "expected": {"powerState": "On", "cleaningState": "CleaningForward", "lastMotion": "Forward", "lastCleaner": "On"}
+    },
+    {
+      "name": "09 dust starts power-up timer",
+      "map": "map_09_dust_start",
+      "steps": [
+        {"op": "pressPowerButton"},
+        {"op": "frontPathClear"},
+        {"op": "dustDetected"}
+      ],
+      "expected": {"powerState": "On", "cleaningState": "PowerUpCleaning", "lastMotion": "Forward", "lastCleaner": "PowerUp"}
+    },
+    {
+      "name": "10 power-up timer expiry restores normal cleaner",
+      "map": "map_10_dust_timeout",
+      "steps": [
+        {"op": "pressPowerButton"},
+        {"op": "frontPathClear"},
+        {"op": "dustDetected"},
+        {"op": "powerUpTimerExpired"}
+      ],
+      "expected": {"powerState": "On", "cleaningState": "CleaningForward", "lastMotion": "Forward", "lastCleaner": "On"}
+    },
+    {
+      "name": "11 repeated dust restarts power-up timer",
+      "map": "map_11_duplicate_dust",
+      "steps": [
+        {"op": "pressPowerButton"},
+        {"op": "frontPathClear"},
+        {"op": "dustDetected"},
+        {"op": "dustDetected"}
+      ],
+      "expected": {"powerState": "On", "cleaningState": "PowerUpCleaning", "lastMotion": "Forward", "lastCleaner": "PowerUp"}
+    },
+    {
+      "name": "12 front obstacle interrupts active power-up",
+      "map": "map_12_dust_then_obstacle",
+      "steps": [
+        {"op": "pressPowerButton"},
+        {"op": "frontPathClear"},
+        {"op": "dustDetected"},
+        {"op": "frontObstacleDetected"}
+      ],
+      "expected": {"powerState": "On", "cleaningState": "AvoidingObstacle", "lastMotion": "Forward", "lastCleaner": "Off"}
+    },
+    {
+      "name": "13 dust is ignored while checking front",
+      "map": "map_13_dust_while_checking",
+      "steps": [
+        {"op": "pressPowerButton"},
+        {"op": "dustDetected"}
+      ],
+      "expected": {"powerState": "On", "cleaningState": "CheckingFront", "lastMotion": "Stop", "lastCleaner": "Off"}
+    },
+    {
+      "name": "14 dust is ignored during obstacle avoidance",
+      "map": "map_14_dust_while_avoiding",
+      "steps": [
+        {"op": "pressPowerButton"},
+        {"op": "frontObstacleDetected"},
+        {"op": "dustDetected"}
+      ],
+      "expected": {"powerState": "On", "cleaningState": "AvoidingObstacle", "lastMotion": "Stop", "lastCleaner": "Off"}
+    },
+    {
+      "name": "15 timer expiry is ignored outside power-up",
+      "map": "map_15_timer_without_powerup",
+      "steps": [
+        {"op": "pressPowerButton"},
+        {"op": "frontPathClear"},
+        {"op": "powerUpTimerExpired"}
+      ],
+      "expected": {"powerState": "On", "cleaningState": "CleaningForward", "lastMotion": "Forward", "lastCleaner": "On"}
+    },
+    {
+      "name": "16 side sensor update ignored outside avoidance",
+      "map": "map_16_side_ignored",
+      "steps": [
+        {"op": "pressPowerButton"},
+        {"op": "frontPathClear"},
+        {"op": "sideSensorUpdated", "leftBlocked": false, "rightBlocked": false}
+      ],
+      "expected": {"powerState": "On", "cleaningState": "CleaningForward", "lastMotion": "Forward", "lastCleaner": "On"}
+    },
+    {
+      "name": "17 motion completion ignored outside avoidance",
+      "map": "map_17_motion_ignored",
+      "steps": [
+        {"op": "pressPowerButton"},
+        {"op": "frontPathClear"},
+        {"op": "motionCompleted", "motion": "TurnLeft"}
+      ],
+      "expected": {"powerState": "On", "cleaningState": "CleaningForward", "lastMotion": "Forward", "lastCleaner": "On"}
+    },
+    {
+      "name": "18 front clear during power-up keeps power-up and moves forward",
+      "map": "map_18_front_clear_during_powerup",
+      "steps": [
+        {"op": "pressPowerButton"},
+        {"op": "frontPathClear"},
+        {"op": "dustDetected"},
+        {"op": "frontPathClear"}
+      ],
+      "expected": {"powerState": "On", "cleaningState": "PowerUpCleaning", "lastMotion": "Forward", "lastCleaner": "PowerUp"}
+    },
+    {
+      "name": "19 power button stops active power-up safely",
+      "map": "map_19_power_off_powerup",
+      "steps": [
+        {"op": "pressPowerButton"},
+        {"op": "frontPathClear"},
+        {"op": "dustDetected"},
+        {"op": "pressPowerButton"}
+      ],
+      "expected": {"powerState": "Off", "cleaningState": "PoweredOff", "lastMotion": "Stop", "lastCleaner": "Off"}
+    },
+    {
+      "name": "20 power button stops obstacle avoidance safely",
+      "map": "map_20_power_off_avoidance",
+      "steps": [
+        {"op": "pressPowerButton"},
+        {"op": "frontObstacleDetected"},
+        {"op": "pressPowerButton"}
+      ],
+      "expected": {"powerState": "Off", "cleaningState": "PoweredOff", "lastMotion": "Stop", "lastCleaner": "Off"}
+    },
+    {
+      "name": "21 front obstacle while cleaning enters avoidance",
+      "map": "map_21_obstacle_while_cleaning",
+      "steps": [
+        {"op": "pressPowerButton"},
+        {"op": "frontPathClear"},
+        {"op": "frontObstacleDetected"}
+      ],
+      "expected": {"powerState": "On", "cleaningState": "AvoidingObstacle", "lastMotion": "Forward", "lastCleaner": "Off"}
+    },
+    {
+      "name": "22 front obstacle while checking enters avoidance",
+      "map": "map_22_obstacle_while_checking",
+      "steps": [
+        {"op": "pressPowerButton"},
+        {"op": "frontObstacleDetected"}
+      ],
+      "expected": {"powerState": "On", "cleaningState": "AvoidingObstacle", "lastMotion": "Stop", "lastCleaner": "Off"}
+    },
+    {
+      "name": "23 front clear from avoidance resumes cleaning",
+      "map": "map_23_front_clear_from_avoidance",
+      "steps": [
+        {"op": "pressPowerButton"},
+        {"op": "frontObstacleDetected"},
+        {"op": "frontPathClear", "_visualRemoveObstacles": [[3, 2]]}
+      ],
+      "expected": {"powerState": "On", "cleaningState": "CleaningForward", "lastMotion": "Forward", "lastCleaner": "On"}
+    },
+    {
+      "name": "24 stop motion completion ignored during avoidance",
+      "map": "map_24_stop_motion_ignored",
+      "steps": [
+        {"op": "pressPowerButton"},
+        {"op": "frontObstacleDetected"},
+        {"op": "motionCompleted", "motion": "Stop"}
+      ],
+      "expected": {"powerState": "On", "cleaningState": "AvoidingObstacle", "lastMotion": "Stop", "lastCleaner": "Off"}
+    },
+    {
+      "name": "25 forward motion completion ignored during avoidance",
+      "map": "map_25_forward_motion_ignored",
+      "steps": [
+        {"op": "pressPowerButton"},
+        {"op": "frontObstacleDetected"},
+        {"op": "motionCompleted", "motion": "Forward"}
+      ],
+      "expected": {"powerState": "On", "cleaningState": "AvoidingObstacle", "lastMotion": "Stop", "lastCleaner": "Off"}
+    },
+    {
+      "name": "26 both side clear still prefers left",
+      "map": "map_26_both_clear_prefers_left",
+      "steps": [
+        {"op": "pressPowerButton"},
+        {"op": "frontObstacleDetected"},
+        {"op": "sideSensorUpdated", "leftBlocked": false, "rightBlocked": false}
+      ],
+      "expected": {"powerState": "On", "cleaningState": "AvoidingObstacle", "lastMotion": "TurnLeft", "lastCleaner": "Off"}
+    },
+    {
+      "name": "27 repeated front clear keeps forward cleaning",
+      "map": "map_27_repeated_front_clear",
+      "steps": [
+        {"op": "pressPowerButton"},
+        {"op": "frontPathClear"},
+        {"op": "frontPathClear"}
+      ],
+      "expected": {"powerState": "On", "cleaningState": "CleaningForward", "lastMotion": "Forward", "lastCleaner": "On"}
+    },
+    {
+      "name": "28 timer expiry after power off is ignored",
+      "map": "map_28_timer_after_power_off",
+      "steps": [
+        {"op": "pressPowerButton"},
+        {"op": "frontPathClear"},
+        {"op": "dustDetected"},
+        {"op": "pressPowerButton"},
+        {"op": "powerUpTimerExpired"}
+      ],
+      "expected": {"powerState": "Off", "cleaningState": "PoweredOff", "lastMotion": "Stop", "lastCleaner": "Off"}
+    },
+    {
+      "name": "29 duplicate dust then timeout returns to normal",
+      "map": "map_29_dust_restart_then_timeout",
+      "steps": [
+        {"op": "pressPowerButton"},
+        {"op": "frontPathClear"},
+        {"op": "dustDetected"},
+        {"op": "dustDetected"},
+        {"op": "powerUpTimerExpired"}
+      ],
+      "expected": {"powerState": "On", "cleaningState": "CleaningForward", "lastMotion": "Forward", "lastCleaner": "On"}
+    },
+    {
+      "name": "30 combined obstacle recovery then dust power-up",
+      "map": "map_30_combined_obstacle_and_dust",
+      "steps": [
+        {"op": "pressPowerButton"},
+        {"op": "frontObstacleDetected"},
+        {"op": "sideSensorUpdated", "leftBlocked": true, "rightBlocked": false},
+        {"op": "motionCompleted", "motion": "TurnRight"},
+        {"op": "dustDetected"}
+      ],
+      "expected": {"powerState": "On", "cleaningState": "PowerUpCleaning", "lastMotion": "Forward", "lastCleaner": "PowerUp"}
+    }
+  ]
+}

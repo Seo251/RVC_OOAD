@@ -116,6 +116,10 @@ makes the robot jump to a strange position when you press Power Button.
 - `Dust Detected`: manually inject a dust detection event.
 - `Timer Expired`: manually fire the 3-second cleaner power-up timer.
 - `Motion Done`: manually confirm the current turn/backward motion.
+- `Load 30 Suite`: load `system_tests/suites/rvc_30_system_tests.json`.
+- `Run Visual Suite`: replay the 30 scenario suite in the simulator UI, one
+  step per second, and stop with a failure message if an expected state does
+  not match.
 - `Save Map` / `Load Map`: save or load obstacle/dust maps.
 
 ### Visualization
@@ -151,11 +155,48 @@ Run unit tests:
 ctest --test-dir build --output-on-failure
 ```
 
-Run system tests after starting the controller app:
+### System Tests
+
+System tests run through the same TCP bridge used by the Python simulator.
+Start the C++ controller app first:
+
+```powershell
+.\build\Debug\rvc_controller_app.exe 5050
+```
+
+In another terminal, run the default system test cases:
 
 ```powershell
 python system_tests\run_system_tests.py --port 5050
 ```
+
+Run the 30-scenario simulator system test suite:
+
+```powershell
+python system_tests\run_system_tests.py --suite system_tests\suites\rvc_30_system_tests.json --port 5050
+```
+
+The runner prints each case name. If every final and step-level expectation
+matches the controller snapshot, it ends with:
+
+```text
+Passed 30 system test cases
+```
+
+If a case fails, the runner stops and prints the case name, expected value, and
+actual value.
+
+To inspect the same 30 scenarios visually:
+
+```powershell
+.\build\Debug\rvc_controller_app.exe 5050
+python simulator\simulator_ui.py
+```
+
+Then click `Connect`, `Load 30 Suite`, and `Run Visual Suite`. The simulator
+applies each case map and replays the test steps at one-second intervals. If an
+expected state does not match, the visual replay stops and shows the failed
+case.
 
 Unit tests target the C++ controller/core only. The Python simulator is excluded
 from unit coverage.

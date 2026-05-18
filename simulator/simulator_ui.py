@@ -66,6 +66,10 @@ class SimulatorUi:
         self.pending_motion_complete: str | None = None
         self.auto_drive_after_id: str | None = None
         self.power_up_after_id: str | None = None
+        self.visual_suite: dict[str, object] | None = None
+        self.visual_case_index = 0
+        self.visual_step_index = 0
+        self.visual_replay_running = False
 
         self.canvas = tk.Canvas(
             self.root, width=GRID_SIZE * CELL_SIZE, height=GRID_SIZE * CELL_SIZE
@@ -98,6 +102,8 @@ class SimulatorUi:
             ("Dust Detected", lambda: self.send("dustDetected")),
             ("Timer Expired", lambda: self.send("powerUpTimerExpired")),
             ("Motion Done", self.complete_current_motion),
+            ("Load 30 Suite", self.load_visual_suite),
+            ("Run Visual Suite", self.start_visual_suite),
             ("Save Map", self.save_map),
             ("Load Map", self.load_map),
         ]
@@ -186,10 +192,12 @@ class SimulatorUi:
         self.status.set(self.format_snapshot(self.snapshot))
         self.draw()
 
-        if self.snapshot.get("powerState") == "On":
+        if self.snapshot.get("powerState") == "On" and not self.visual_replay_running:
             self.schedule_tick()
         else:
-            self.stop_all_timers()
+            self.cancel_tick()
+            if self.snapshot.get("powerState") != "On":
+                self.cancel_power_up_timer()
 
         return self.snapshot
 
@@ -298,6 +306,8 @@ class SimulatorUi:
         if self.snapshot.get("powerState") != "On":
             return
         if self.snapshot.get("cleaningState") != "PowerUpCleaning":
+            return
+        if self.visual_replay_running:
             return
         self.send("powerUpTimerExpired")
 
@@ -486,6 +496,7 @@ class SimulatorUi:
         data = {
             "size": GRID_SIZE,
             "robot": list(self.robot),
+            "heading": list(self.heading),
             "obstacles": [list(cell) for cell in sorted(self.obstacles)],
             "dust": [list(cell) for cell in sorted(self.dust)],
         }
@@ -496,10 +507,247 @@ class SimulatorUi:
         if not path:
             return
         data = json.loads(Path(path).read_text(encoding="utf-8"))
+        self.apply_map_data(data)
+
+    def apply_map_data(self, data: dict[str, object]) -> None:
         self.robot = tuple(data.get("robot", self.robot))  # type: ignore[assignment]
+        heading = tuple(data.get("heading", (0, -1)))  # type: ignore[arg-type]
+        self.heading = heading if heading in HEADING_NAMES else (0, -1)
         self.obstacles = {tuple(item) for item in data.get("obstacles", [])}
         self.dust = {tuple(item) for item in data.get("dust", [])}
+        self.pending_motion_complete = None
         self.draw()
+
+    # ------------------------------------------------------------------
+    # Visual system-test replay
+    # ------------------------------------------------------------------
+
+    def load_visual_suite(self) -> None:
+        default_path = Path("system_tests/suites/rvc_30_system_tests.json")
+        if default_path.exists():
+            path = str(default_path)
+        else:
+            selected = filedialog.askopenfilename(filetypes=[("JSON", "*.json")])
+            if not selected:
+                return
+            path = selected
+
+        try:
+            self.visual_suite = json.loads(Path(path).read_text(encoding="utf-8"))
+        except (OSError, json.JSONDecodeError) as error:
+            messagebox.showerror("Suite load failed", str(error))
+            return
+
+        maps = self.visual_suite.get("maps", {})
+        cases = self.visual_suite.get("cases", [])
+        self.status.set(
+            f"Loaded visual suite\nMaps: {len(maps)}\nCases: {len(cases)}"
+        )
+
+    def start_visual_suite(self) -> None:
+        if self.visual_suite is None:
+            self.load_visual_suite()
+        if self.visual_suite is None:
+            return
+
+        self.connect()
+        self.visual_replay_running = True
+        self.stop_all_timers()
+        self.visual_case_index = 0
+        self.visual_step_index = 0
+        self.root.after(0, self.start_next_visual_case)
+
+    def start_next_visual_case(self) -> None:
+        if self.visual_suite is None:
+            return
+        cases = self.visual_suite.get("cases", [])
+        if not isinstance(cases, list):
+            messagebox.showerror("Suite error", "Suite cases must be a list")
+            self.visual_replay_running = False
+            return
+        if self.visual_case_index >= len(cases):
+            self.visual_replay_running = False
+            self.status.set(f"Visual suite complete\nPassed {len(cases)} cases")
+            return
+
+        case = cases[self.visual_case_index]
+        if not isinstance(case, dict):
+            self.visual_replay_running = False
+            messagebox.showerror("Suite error", "Case must be an object")
+            return
+
+        if not self.prepare_visual_case(case):
+            self.visual_replay_running = False
+            return
+
+        self.visual_step_index = 0
+        self.status.set(f"Visual case {self.visual_case_index + 1}: {case['name']}")
+        self.root.after(TICK_MS, self.run_next_visual_step)
+
+    def prepare_visual_case(self, case: dict[str, object]) -> bool:
+        maps = self.visual_suite.get("maps", {}) if self.visual_suite else {}
+        if not isinstance(maps, dict):
+            messagebox.showerror("Suite error", "Suite maps must be an object")
+            return False
+
+        map_name = str(case.get("map", ""))
+        map_data = maps.get(map_name)
+        if not isinstance(map_data, dict):
+            messagebox.showerror("Suite error", f"Missing map: {map_name}")
+            return False
+
+        self.stop_all_timers()
+        self.pending_motion_complete = None
+
+        # Reset controller state between visual cases, then sync event counters
+        # so events from previous cases are not replayed on the new map.
+        if self.snapshot.get("powerState") == "On":
+            self.send("pressPowerButton")
+        try:
+            self.snapshot = self.client.send(SYNC_OP)
+        except (OSError, ConnectionError, json.JSONDecodeError) as error:
+            messagebox.showerror("Controller error", str(error))
+            return False
+        self.sync_counters_to_snapshot()
+        self.apply_map_data(map_data)
+        return True
+
+    def run_next_visual_step(self) -> None:
+        if not self.visual_replay_running or self.visual_suite is None:
+            return
+
+        cases = self.visual_suite.get("cases", [])
+        case = cases[self.visual_case_index]
+        steps = case.get("steps", [])
+        if not isinstance(steps, list):
+            self.fail_visual_case("steps must be a list")
+            return
+
+        if self.visual_step_index >= len(steps):
+            expected = case.get("expected", {})
+            if not isinstance(expected, dict):
+                self.fail_visual_case("expected must be an object")
+                return
+            if not self.snapshot_matches(expected):
+                self.fail_visual_case(
+                    f"final expected {expected}, got {self.snapshot}"
+                )
+                return
+            self.visual_case_index += 1
+            self.root.after(TICK_MS, self.start_next_visual_case)
+            return
+
+        step = dict(steps[self.visual_step_index])
+        self.visual_step_index += 1
+        op = step.pop("op")
+        expected = step.pop("expect", None)
+        delay = int(step.pop("_visualDelayMs", 0))
+        if op == "powerUpTimerExpired" and delay == 0:
+            delay = POWER_UP_MS
+
+        if delay > 0:
+            case_name = str(case.get("name", "unknown"))
+            self.status.set(
+                f"Visual case {self.visual_case_index + 1}: {case_name}\n"
+                f"Waiting {delay // 1000}s before {op}\n\n"
+                f"{self.format_snapshot(self.snapshot)}"
+            )
+            self.root.after(
+                delay,
+                lambda: self.execute_visual_step(str(op), step, expected, len(steps)),
+            )
+            return
+
+        self.execute_visual_step(str(op), step, expected, len(steps))
+
+    def execute_visual_step(
+        self,
+        op: str,
+        step: dict[str, object],
+        expected: object,
+        total_steps: int,
+    ) -> None:
+        if not self.visual_replay_running or self.visual_suite is None:
+            return
+
+        case = self.visual_suite.get("cases", [])[self.visual_case_index]
+        snapshot = self.send_visual_step(str(op), step)
+        if snapshot is None:
+            self.visual_replay_running = False
+            return
+        if isinstance(expected, dict) and not self.snapshot_matches(expected):
+            self.fail_visual_case(
+                f"step {self.visual_step_index} expected {expected}, got {snapshot}"
+            )
+            return
+
+        case_name = str(case.get("name", "unknown"))
+        self.status.set(
+            f"Visual case {self.visual_case_index + 1}: {case_name}\n"
+            f"Step {self.visual_step_index}/{total_steps}\n\n"
+            f"{self.format_snapshot(self.snapshot)}"
+        )
+        self.root.after(TICK_MS, self.run_next_visual_step)
+
+    def send_visual_step(self, op: str, payload: dict[str, object]) -> dict[str, object] | None:
+        self.apply_visual_map_updates(payload)
+
+        if op in {"frontPathClear", "frontObstacleDetected"}:
+            return self.send_visual_front_sensor_from_map()
+        if op == "sideSensorUpdated":
+            return self.send_visual_side_sensor_from_map()
+        if op == "dustDetected":
+            return self.send_visual_dust_sensor_from_map()
+        if op == "motionCompleted":
+            motion = str(payload.get("motion", self.pending_motion_complete or "TurnLeft"))
+            return self.send("motionCompleted", motion=motion)
+        return self.send(op, **payload)
+
+    def apply_visual_map_updates(self, payload: dict[str, object]) -> None:
+        for cell in payload.pop("_visualRemoveObstacles", []):
+            self.obstacles.discard(tuple(cell))  # type: ignore[arg-type]
+        for cell in payload.pop("_visualAddObstacles", []):
+            obstacle = tuple(cell)  # type: ignore[arg-type]
+            self.obstacles.add(obstacle)
+            self.dust.discard(obstacle)
+        for cell in payload.pop("_visualAddDust", []):
+            dust = tuple(cell)  # type: ignore[arg-type]
+            self.dust.add(dust)
+            self.obstacles.discard(dust)
+        for cell in payload.pop("_visualRemoveDust", []):
+            self.dust.discard(tuple(cell))  # type: ignore[arg-type]
+        self.draw()
+
+    def send_visual_front_sensor_from_map(self) -> dict[str, object] | None:
+        if self.is_cell_blocked(self.front_cell()):
+            return self.send("frontObstacleDetected")
+        return self.send("frontPathClear")
+
+    def send_visual_side_sensor_from_map(self) -> dict[str, object] | None:
+        left_blocked = self.is_cell_blocked(self.left_cell())
+        right_blocked = self.is_cell_blocked(self.right_cell())
+        return self.send(
+            "sideSensorUpdated",
+            leftBlocked=left_blocked,
+            rightBlocked=right_blocked,
+        )
+
+    def send_visual_dust_sensor_from_map(self) -> dict[str, object] | None:
+        if self.robot not in self.dust:
+            self.fail_visual_case(
+                f"DustDetected requested but robot is not on dust at {self.robot}"
+            )
+            return None
+        return self.send("dustDetected")
+
+    def snapshot_matches(self, expected: dict[str, object]) -> bool:
+        return all(self.snapshot.get(key) == value for key, value in expected.items())
+
+    def fail_visual_case(self, message: str) -> None:
+        self.visual_replay_running = False
+        case_number = self.visual_case_index + 1
+        self.status.set(f"Visual suite FAILED at case {case_number}\n{message}")
+        messagebox.showerror("Visual suite failed", f"Case {case_number}: {message}")
 
     def run(self) -> None:
         try:
