@@ -1,0 +1,66 @@
+@startuml FR_Traceability_UC001
+title FR Traceability - UC-001 Start Cleaning
+
+skinparam shadowing false
+skinparam linetype ortho
+skinparam nodesep 8
+skinparam ranksep 14
+skinparam defaultFontSize 10
+skinparam ArrowColor #707070
+
+left to right direction
+
+package "FR / Use Case" #DCEEFF {
+  card "FR-001\nInitial Off" as FR001
+  card "FR-002\nStart Cleaning" as FR002
+  card "FR-004\nCheck Front" as FR004
+  card "FR-005\nForward+On" as FR005
+}
+
+package "System Operation" #FFF4D6 {
+  card "PressPowerButton()" as OP1
+  card "FrontPathClear()" as OP2
+  card "FrontObstacleDetected()" as OP3
+}
+
+package "Method" #E8F8E8 {
+  card "PressPowerButton()" as M1
+  card "SetPowerState/SetCleaningState" as M2
+  card "RequestFrontCheck()" as M3
+  card "FrontPathClear()" as M4
+  card "ResumeForwardCleaning()" as M5
+  card "Forward(), TurnOn()" as M6
+}
+
+package "Class" #F8E0F0 {
+  card "RvcController" as C1
+  card "ControllerState" as C2
+  card "FrontSensorPort" as C3
+  card "MotorPort" as C4
+  card "CleanerPort" as C5
+}
+
+FR001 --> OP1
+FR002 --> OP1
+FR002 --> OP2
+FR004 --> OP1
+FR004 --> OP2
+FR004 --> OP3
+FR005 --> OP2
+
+OP1 --> M1
+OP1 --> M2
+OP1 --> M3
+OP2 --> M4
+OP2 --> M5
+OP3 --> M4
+
+M1 --> C1
+M2 --> C2
+M3 --> C3
+M4 --> C1
+M5 --> C1
+M6 --> C4
+M6 --> C5
+
+@enduml

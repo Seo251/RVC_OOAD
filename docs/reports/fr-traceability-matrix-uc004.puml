@@ -1,0 +1,77 @@
+@startuml FR_Traceability_UC004
+title FR Traceability - UC-004 Power Up Cleaning On Dust
+
+skinparam shadowing false
+skinparam linetype ortho
+skinparam nodesep 8
+skinparam ranksep 14
+skinparam defaultFontSize 10
+skinparam ArrowColor #707070
+
+left to right direction
+
+package "FR / Use Case" #DCEEFF {
+  card "FR-015\nDust PowerUp 3s\nMotor keeps Forward" as FR015
+  card "FR-016\nTimer Expiry\nCleaner On" as FR016
+  card "FR-021\nDuplicate Dust\nRestart Timer" as FR021
+  card "FR-017\nObstacle Cancels\nPowerUp" as FR017
+}
+
+package "System Operation" #FFF4D6 {
+  card "DustDetected()" as OP1
+  card "PowerUpTimerExpired()" as OP2
+  card "FrontPathClear()" as OP3
+  card "FrontObstacleDetected()" as OP4
+}
+
+package "Method" #E8F8E8 {
+  card "DustDetected()" as M1
+  card "StartPowerUpTimer(3)" as M2
+  card "RestartPowerUpTimer(3)" as M3
+  card "PowerUp(), SetCleaningState" as M4
+  card "PowerUpTimerExpired()" as M5
+  card "TurnOn(), CleaningForward" as M6
+  card "FrontPathClear()\nForward() only" as M7
+  card "FrontObstacleDetected()\nCancel timer" as M8
+}
+
+package "Class" #F8E0F0 {
+  card "RvcController" as C1
+  card "ControllerState" as C2
+  card "CleanerPort" as C3
+  card "TimerPort" as C4
+  card "MotorPort" as C5
+}
+
+FR015 --> OP1
+FR015 --> OP3
+FR016 --> OP2
+FR021 --> OP1
+FR017 --> OP4
+
+OP1 --> M1
+OP1 --> M2
+OP1 --> M3
+OP1 --> M4
+OP2 --> M5
+OP2 --> M6
+OP3 --> M7
+OP4 --> M8
+
+M1 --> C1
+M4 --> C3
+M2 --> C4
+M3 --> C4
+M5 --> C1
+M6 --> C3
+M7 --> C5
+M8 --> C1
+M8 --> C4
+
+note bottom of C1
+  NFR-011: DustDetected() and PowerUpTimerExpired()
+  do not issue motor commands.
+  Forward is driven by FrontPathClear().
+end note
+
+@enduml

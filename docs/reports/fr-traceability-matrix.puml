@@ -1,0 +1,308 @@
+@startuml FR_Traceability_Matrix
+' RVC Controller - FR Traceability Matrix
+' Layout: FR/Use Case -> System Operation (SSD/OOD SD) -> Method -> Class
+' Render: plantuml docs/reports/fr-traceability-matrix.puml
+
+title RVC Controller - FR Traceability Matrix
+
+skinparam shadowing false
+skinparam linetype ortho
+skinparam nodesep 6
+skinparam ranksep 10
+skinparam defaultFontSize 9
+skinparam ArrowColor #707070
+skinparam ArrowThickness 1
+skinparam packageStyle rectangle
+skinparam card {
+  BackgroundColor white
+  BorderColor #333333
+  FontSize 9
+}
+
+left to right direction
+
+' =============================================================================
+' COLUMN 1 : FR / Essential Use Case
+' =============================================================================
+package "FR / Use Case" as COL_FR #DCEEFF {
+
+  card "FR-001\nInitial Power Off" as FR001
+  card "FR-002\nStart Cleaning\n(UC-001)" as FR002
+  card "FR-003\nStop Cleaning\n(UC-002)" as FR003
+  card "FR-004\nCheck Front Path\n(UC-001,003)" as FR004
+  card "FR-005\nForward + Clean On\n(UC-001)" as FR005
+  card "FR-006\nStart Avoidance\n(UC-003)" as FR006
+  card "FR-007\nCleaner Off\nDuring Avoidance" as FR007
+  card "FR-008\nCheck Left First" as FR008
+  card "FR-009\nTurn Left" as FR009
+  card "FR-010\nCheck Right" as FR010
+  card "FR-011\nTurn Right" as FR011
+  card "FR-012\nBackward Both\nBlocked" as FR012
+  card "FR-013\nTurn After\nBackward" as FR013
+  card "FR-014\nResume Forward\nCleaning" as FR014
+  card "FR-015\nDust PowerUp 3s\nKeep Forward" as FR015
+  card "FR-016\nNormalize Cleaner\nAfter 3s" as FR016
+  card "FR-017\nObstacle During\nPowerUp" as FR017
+  card "FR-021\nDuplicate Dust\nReset Timer" as FR021
+  card "FR-018\nMotor Command\nEnum" as FR018
+  card "FR-019\nCleaner Command\nEnum" as FR019
+  card "FR-020\nAll Sensor/Button\nInputs" as FR020
+}
+
+' =============================================================================
+' COLUMN 2 : System Operation (Sequence Diagram boundary)
+' =============================================================================
+package "System Operation\n(SSD / OOD SD)" as COL_OP #FFF4D6 {
+
+  card "PressPowerButton()" as OP_PPB
+  card "FrontPathClear()" as OP_FPC
+  card "FrontObstacleDetected()" as OP_FOD
+  card "SideSensorUpdated()" as OP_SSU
+  card "MotionCompleted()" as OP_MC
+  card "DustDetected()" as OP_DD
+  card "PowerUpTimerExpired()" as OP_PUT
+}
+
+' =============================================================================
+' COLUMN 3 : Method (implementation)
+' =============================================================================
+package "Method" as COL_M #E8F8E8 {
+
+  card "PressPowerButton()" as M_PPB
+  card "PowerOffSafely()" as M_POFS
+  card "FrontPathClear()" as M_FPC
+  card "ResumeForwardCleaning()" as M_RFC
+  card "FrontObstacleDetected()" as M_FOD
+  card "SideSensorUpdated()" as M_SSU
+  card "SelectMotion()" as M_SM
+  card "MotionCompleted()" as M_MC
+  card "DustDetected()" as M_DD
+  card "PowerUpTimerExpired()" as M_PUT
+  card "SetLastMotion()" as M_SLM
+  card "SetLastCleaner()" as M_SLC
+  card "SetPowerState()" as M_SPS
+  card "SetCleaningState()" as M_SCS
+  card "IsPoweredOn/Off()\nIsAvoidingObstacle()\nCurrentCleaningState()" as M_STATEQ
+  card "Forward()" as M_FWD
+  card "Backward()" as M_BWD
+  card "TurnLeft()" as M_TL
+  card "TurnRight()" as M_TR
+  card "Stop()" as M_STOP
+  card "TurnOn()" as M_TON
+  card "TurnOff()" as M_TOFF
+  card "PowerUp()" as M_PUP
+  card "StartPowerUpTimer()" as M_STIMER
+  card "RestartPowerUpTimer()" as M_RTIMER
+  card "CancelPowerUpTimer()" as M_CTIMER
+  card "RequestFrontCheck()" as M_RFCHECK
+  card "RequestSideCheck()" as M_RSCHECK
+  card "Update()" as M_UPD
+  card "Snapshot()" as M_SNAP
+  card "ToString()" as M_TOSTR
+}
+
+' =============================================================================
+' COLUMN 4 : Class
+' =============================================================================
+package "Class" as COL_C #F8E0F0 {
+
+  card "RvcController" as C_RC
+  card "ControllerState" as C_CS
+  card "ObstacleAvoidancePolicy" as C_OAP
+  card "MotorPort" as C_MP
+  card "CleanerPort" as C_CP
+  card "TimerPort" as C_TP
+  card "FrontSensorPort" as C_FSP
+  card "SideSensorPort" as C_SSP
+  card "SensorInput" as C_SI
+  card "ControlCommand" as C_CC
+  card "ControllerSnapshot" as C_CSNAP
+  card "MotionCommand\n(enum)" as C_MCMD
+  card "CleanerCommand\n(enum)" as C_CCMD
+}
+
+' =============================================================================
+' LINKS : FR -> System Operation
+' =============================================================================
+FR001 ..> OP_PPB : initial Off
+
+FR002 --> OP_PPB
+FR002 --> OP_FPC
+
+FR003 --> OP_PPB
+
+FR004 --> OP_PPB
+FR004 --> OP_FPC
+FR004 --> OP_FOD
+
+FR005 --> OP_FPC
+
+FR006 --> OP_FOD
+FR007 --> OP_FOD
+
+FR008 --> OP_SSU
+FR009 --> OP_SSU
+FR010 --> OP_SSU
+FR011 --> OP_SSU
+
+FR012 --> OP_SSU
+FR013 --> OP_SSU
+FR013 --> OP_MC
+
+FR014 --> OP_MC
+FR014 --> OP_FPC
+
+FR015 --> OP_DD
+FR015 --> OP_FPC
+
+FR016 --> OP_PUT
+
+FR017 --> OP_FOD
+
+FR021 --> OP_DD
+
+FR018 --> OP_PPB
+FR018 --> OP_FPC
+FR018 --> OP_FOD
+FR018 --> OP_SSU
+FR018 --> OP_MC
+
+FR019 --> OP_PPB
+FR019 --> OP_FOD
+FR019 --> OP_DD
+FR019 --> OP_PUT
+FR019 --> OP_FPC
+FR019 --> OP_MC
+
+FR020 --> OP_PPB
+FR020 --> OP_FPC
+FR020 --> OP_FOD
+FR020 --> OP_SSU
+FR020 --> OP_MC
+FR020 --> OP_DD
+FR020 --> OP_PUT
+
+' =============================================================================
+' LINKS : System Operation -> Method
+' =============================================================================
+OP_PPB --> M_PPB
+OP_PPB --> M_POFS
+OP_PPB --> M_SPS
+OP_PPB --> M_SCS
+OP_PPB --> M_RFCHECK
+OP_PPB --> M_CTIMER
+OP_PPB --> M_STOP
+OP_PPB --> M_TOFF
+OP_PPB --> M_SLM
+OP_PPB --> M_SLC
+
+OP_FPC --> M_FPC
+OP_FPC --> M_RFC
+OP_FPC --> M_FWD
+OP_FPC --> M_TON
+OP_FPC --> M_SLM
+OP_FPC --> M_SLC
+
+OP_FOD --> M_FOD
+OP_FOD --> M_CTIMER
+OP_FOD --> M_TOFF
+OP_FOD --> M_SLC
+OP_FOD --> M_SCS
+OP_FOD --> M_RSCHECK
+
+OP_SSU --> M_SSU
+OP_SSU --> M_SM
+OP_SSU --> M_TL
+OP_SSU --> M_TR
+OP_SSU --> M_BWD
+OP_SSU --> M_SLM
+
+OP_MC --> M_MC
+OP_MC --> M_RFC
+OP_MC --> M_RSCHECK
+
+OP_DD --> M_DD
+OP_DD --> M_PUP
+OP_DD --> M_STIMER
+OP_DD --> M_RTIMER
+OP_DD --> M_SLC
+OP_DD --> M_SCS
+
+OP_PUT --> M_PUT
+OP_PUT --> M_TON
+OP_PUT --> M_SLC
+OP_PUT --> M_SCS
+
+' FR-020 compatibility path
+FR020 ..> M_UPD
+FR020 ..> M_SNAP
+
+' =============================================================================
+' LINKS : Method -> Class
+' =============================================================================
+M_PPB --> C_RC
+M_POFS --> C_RC
+M_FPC --> C_RC
+M_RFC --> C_RC
+M_FOD --> C_RC
+M_SSU --> C_RC
+M_MC --> C_RC
+M_DD --> C_RC
+M_PUT --> C_RC
+M_SLM --> C_RC
+M_SLC --> C_RC
+M_UPD --> C_RC
+M_SNAP --> C_RC
+
+M_SPS --> C_CS
+M_SCS --> C_CS
+M_STATEQ --> C_CS
+
+M_SM --> C_OAP
+
+M_FWD --> C_MP
+M_BWD --> C_MP
+M_TL --> C_MP
+M_TR --> C_MP
+M_STOP --> C_MP
+
+M_TON --> C_CP
+M_TOFF --> C_CP
+M_PUP --> C_CP
+
+M_STIMER --> C_TP
+M_RTIMER --> C_TP
+M_CTIMER --> C_TP
+
+M_RFCHECK --> C_FSP
+M_RSCHECK --> C_SSP
+
+M_UPD --> C_SI
+M_UPD --> C_CC
+M_SNAP --> C_CSNAP
+
+M_FWD ..> C_MCMD
+M_BWD ..> C_MCMD
+M_TL ..> C_MCMD
+M_TR ..> C_MCMD
+M_STOP ..> C_MCMD
+M_TON ..> C_CCMD
+M_TOFF ..> C_CCMD
+M_PUP ..> C_CCMD
+M_SLM ..> C_MCMD
+M_SLC ..> C_CCMD
+M_TOSTR ..> C_MCMD
+M_TOSTR ..> C_CCMD
+
+legend right
+  |= Layer |= Meaning |
+  | FR / Use Case | Functional Requirement + UC |
+  | System Operation | SSD / OOD Sequence Diagram message |
+  | Method | C++ member function or port call |
+  | Class | OOD Class Diagram class |
+  ----
+  Unit Test: 24 GTest cases
+  System Test: 30 scenarios (rvc_30_system_tests.json)
+endlegend
+
+@enduml

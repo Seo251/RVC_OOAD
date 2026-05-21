@@ -1,0 +1,51 @@
+@startuml FR_Traceability_UC002
+title FR Traceability - UC-002 Stop Cleaning
+
+skinparam shadowing false
+skinparam linetype ortho
+skinparam nodesep 8
+skinparam ranksep 14
+skinparam defaultFontSize 10
+skinparam ArrowColor #707070
+
+left to right direction
+
+package "FR / Use Case" #DCEEFF {
+  card "FR-003\nStop Cleaning" as FR003
+}
+
+package "System Operation" #FFF4D6 {
+  card "PressPowerButton()" as OP1
+}
+
+package "Method" #E8F8E8 {
+  card "PressPowerButton()" as M1
+  card "PowerOffSafely()" as M2
+  card "CancelPowerUpTimer()" as M3
+  card "Stop(), TurnOff()" as M4
+  card "SetPowerState(Off)\nSetCleaningState(PoweredOff)" as M5
+}
+
+package "Class" #F8E0F0 {
+  card "RvcController" as C1
+  card "ControllerState" as C2
+  card "TimerPort" as C3
+  card "MotorPort" as C4
+  card "CleanerPort" as C5
+}
+
+FR003 --> OP1
+OP1 --> M1
+OP1 --> M2
+M2 --> M3
+M2 --> M4
+M2 --> M5
+
+M1 --> C1
+M2 --> C1
+M3 --> C3
+M4 --> C4
+M4 --> C5
+M5 --> C2
+
+@enduml

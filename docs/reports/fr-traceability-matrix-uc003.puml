@@ -1,0 +1,85 @@
+@startuml FR_Traceability_UC003
+title FR Traceability - UC-003 Avoid Obstacle
+
+skinparam shadowing false
+skinparam linetype ortho
+skinparam nodesep 6
+skinparam ranksep 12
+skinparam defaultFontSize 9
+skinparam ArrowColor #707070
+
+left to right direction
+
+package "FR / Use Case" #DCEEFF {
+  card "FR-006\nStart Avoidance" as FR006
+  card "FR-007\nCleaner Off" as FR007
+  card "FR-008\nLeft First" as FR008
+  card "FR-009\nTurn Left" as FR009
+  card "FR-010\nCheck Right" as FR010
+  card "FR-011\nTurn Right" as FR011
+  card "FR-012\nBackward" as FR012
+  card "FR-013\nRetry Side" as FR013
+  card "FR-014\nResume Clean" as FR014
+  card "FR-017\nObstacle in\nPowerUp" as FR017
+}
+
+package "System Operation" #FFF4D6 {
+  card "FrontObstacleDetected()" as OP1
+  card "SideSensorUpdated()" as OP2
+  card "MotionCompleted()" as OP3
+  card "FrontPathClear()" as OP4
+}
+
+package "Method" #E8F8E8 {
+  card "FrontObstacleDetected()" as M1
+  card "SideSensorUpdated()" as M2
+  card "SelectMotion()" as M3
+  card "TurnLeft/Right/Backward()" as M4
+  card "MotionCompleted()" as M5
+  card "ResumeForwardCleaning()" as M6
+  card "RequestSideCheck()" as M7
+}
+
+package "Class" #F8E0F0 {
+  card "RvcController" as C1
+  card "ObstacleAvoidancePolicy" as C2
+  card "CleanerPort" as C3
+  card "MotorPort" as C4
+  card "SideSensorPort" as C5
+  card "TimerPort" as C6
+}
+
+FR006 --> OP1
+FR007 --> OP1
+FR008 --> OP2
+FR009 --> OP2
+FR010 --> OP2
+FR011 --> OP2
+FR012 --> OP2
+FR013 --> OP2
+FR013 --> OP3
+FR014 --> OP3
+FR014 --> OP4
+FR017 --> OP1
+
+OP1 --> M1
+OP2 --> M2
+OP2 --> M3
+OP3 --> M5
+OP4 --> M6
+
+M2 --> M3
+M3 --> M4
+M5 --> M7
+M5 --> M6
+
+M1 --> C1
+M2 --> C1
+M3 --> C2
+M4 --> C4
+M1 --> C3
+M1 --> C6
+M7 --> C5
+M6 --> C1
+
+@enduml
