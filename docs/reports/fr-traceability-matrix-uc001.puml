@@ -2,7 +2,7 @@
 title FR Traceability - UC-001 Start Cleaning
 
 skinparam shadowing false
-skinparam linetype ortho
+skinparam linetype polyline
 skinparam nodesep 8
 skinparam ranksep 14
 skinparam defaultFontSize 10

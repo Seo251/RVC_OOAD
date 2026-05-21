@@ -2,7 +2,7 @@
 title FR Traceability - UC-003 Avoid Obstacle
 
 skinparam shadowing false
-skinparam linetype ortho
+skinparam linetype polyline
 skinparam nodesep 6
 skinparam ranksep 12
 skinparam defaultFontSize 9

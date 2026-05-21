@@ -6,7 +6,7 @@
 title RVC Controller - FR Traceability Matrix
 
 skinparam shadowing false
-skinparam linetype ortho
+skinparam linetype polyline
 skinparam nodesep 6
 skinparam ranksep 10
 skinparam defaultFontSize 9
