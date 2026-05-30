@@ -8,7 +8,7 @@ class RvcController {
   +PressPowerButton()
   +FrontObstacleDetected()
   +FrontPathClear()
-  +SideSensorUpdated(leftBlocked, rightBlocked)
+  +SideSensorUpdated(leftBlocked)
   +DustDetected()
   +PowerUpTimerExpired()
   +MotionCompleted(motion)
@@ -18,6 +18,7 @@ class RvcController {
   -SetLastCleaner(cleaner)
   -ResumeForwardCleaning()
   -PowerOffSafely()
+  -right_turn_attempted_: bool
 }
 
 class ControllerState {
@@ -33,7 +34,7 @@ class ControllerState {
 }
 
 class ObstacleAvoidancePolicy {
-  +SelectMotion(leftBlocked, rightBlocked): MotionCommand
+  +SelectMotion(leftBlocked): MotionCommand
 }
 
 interface MotorPort {
@@ -67,7 +68,6 @@ interface TimerPort {
 class SensorInput {
   +front_obstacle: bool
   +left_obstacle: bool
-  +right_obstacle: bool
   +dust_detected: bool
 }
 
@@ -141,10 +141,14 @@ and Update() are implementation helpers
 used for state reporting and legacy tests.
 end note
 
-note bottom of ObstacleAvoidancePolicy
-Left-first rule:
-left clear -> TurnLeft
-right clear -> TurnRight
-both blocked -> Backward
+note bottom of ObstacleAvoidancePolicy #BBDEFB
+[CHG-001][Option C] Left-only side sensor:
+left clear  -> TurnLeft
+left blocked -> TurnRight (fallback, no right sensor)
+Dead-end (front still blocked after the right turn,
+tracked by right_turn_attempted_) is handled by
+RvcController: TurnLeft to restore the original
+heading first, then Backward into the open cell
+behind (avoids reversing into the left obstacle).
 end note
 @enduml

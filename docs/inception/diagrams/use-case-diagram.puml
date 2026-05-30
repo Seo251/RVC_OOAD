@@ -5,7 +5,8 @@ skinparam packageStyle rectangle
 actor User
 actor "Front Sensor" as FrontSensor
 actor "Left Sensor" as LeftSensor
-actor "Right Sensor" as RightSensor
+' [CHG-001] deleted: Right Sensor actor (장애물 감지는 Front + Left 만 사용)
+' actor "Right Sensor" as RightSensor
 actor "Dust Sensor" as DustSensor
 actor Timer
 
@@ -26,9 +27,16 @@ User --> UC_Stop
 FrontSensor --> UC_CheckFront
 FrontSensor --> UC_Avoid
 LeftSensor --> UC_Avoid
-RightSensor --> UC_Avoid
+' [CHG-001] deleted: RightSensor --> UC_Avoid
 DustSensor --> UC_Dust
 Timer --> UC_Restore
+
+note bottom of UC_Avoid #FFCDD2
+[CHG-001] Right Sensor 제거.
+회피는 Front + Left 센서만 사용한다.
+좌측 막힘 시 우회전(fallback) 후 전방 재확인,
+dead-end는 좌회전(복원)+후진(Option C).
+end note
 
 UC_Start .> UC_CheckFront : <<include>>
 UC_CheckFront .> UC_Avoid : <<extend>>

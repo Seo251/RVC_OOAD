@@ -4,7 +4,7 @@
   "steps": [
     {"op": "pressPowerButton"},
     {"op": "frontObstacleDetected"},
-    {"op": "sideSensorUpdated", "leftBlocked": false, "rightBlocked": true},
+    {"op": "sideSensorUpdated", "leftBlocked": false},
     {"op": "motionCompleted", "motion": "TurnLeft"}
   ],
   "expected": {

@@ -73,40 +73,111 @@ TEST(RvcControllerTest, FrontObstacleInterruptsPowerUpAndRequestsSideCheck) {
                                       "side.request"}));
 }
 
+// [CHG-001] 좌측이 비면 좌회전 (우측 센서 없음).
 TEST(RvcControllerTest, AvoidanceTurnsLeftWhenLeftIsClear) {
   ControllerFixture fixture;
   fixture.controller.PressPowerButton();
   fixture.controller.FrontObstacleDetected();
   fixture.log.calls.clear();
 
-  fixture.controller.SideSensorUpdated(false, true);
+  fixture.controller.SideSensorUpdated(false);
 
   EXPECT_EQ(fixture.controller.Snapshot().last_motion, MotionCommand::TurnLeft);
   EXPECT_EQ(fixture.log.calls, std::vector<std::string>{"motor.turnLeft"});
 }
 
-TEST(RvcControllerTest, AvoidanceTurnsRightWhenLeftBlockedAndRightClear) {
+// [CHG-001] 좌측이 막히면 우회전(fallback). 후진은 하지 않는다.
+TEST(RvcControllerTest, AvoidanceTurnsRightWhenLeftBlocked) {
   ControllerFixture fixture;
   fixture.controller.PressPowerButton();
   fixture.controller.FrontObstacleDetected();
   fixture.log.calls.clear();
 
-  fixture.controller.SideSensorUpdated(true, false);
+  fixture.controller.SideSensorUpdated(true);
 
   EXPECT_EQ(fixture.controller.Snapshot().last_motion, MotionCommand::TurnRight);
   EXPECT_EQ(fixture.log.calls, std::vector<std::string>{"motor.turnRight"});
 }
 
-TEST(RvcControllerTest, AvoidanceMovesBackwardWhenBothSidesBlocked) {
+// [CHG-001] 우회전 완료 후에는 전방을 재확인한다 (즉시 복귀하지 않는다).
+TEST(RvcControllerTest, RightTurnCompletionRequestsFrontRecheck) {
   ControllerFixture fixture;
   fixture.controller.PressPowerButton();
   fixture.controller.FrontObstacleDetected();
+  fixture.controller.SideSensorUpdated(true);
   fixture.log.calls.clear();
 
-  fixture.controller.SideSensorUpdated(true, true);
+  fixture.controller.MotionCompleted(MotionCommand::TurnRight);
 
+  EXPECT_EQ(fixture.controller.Snapshot().cleaning_state,
+            CleaningState::AvoidingObstacle);
+  EXPECT_EQ(fixture.log.calls, std::vector<std::string>{"front.request"});
+}
+
+// [CHG-001] 우회전 후 전방이 비면(우측이 열려 있던 경우) 후진 없이 복귀한다.
+TEST(RvcControllerTest, RightTurnWithClearFrontResumesWithoutBackward) {
+  ControllerFixture fixture;
+  fixture.controller.PressPowerButton();
+  fixture.controller.FrontObstacleDetected();
+  fixture.controller.SideSensorUpdated(true);
+  fixture.controller.MotionCompleted(MotionCommand::TurnRight);
+  fixture.log.calls.clear();
+
+  fixture.controller.FrontPathClear();
+
+  const ControllerSnapshot snapshot = fixture.controller.Snapshot();
+  EXPECT_EQ(snapshot.cleaning_state, CleaningState::CleaningForward);
+  EXPECT_EQ(snapshot.last_motion, MotionCommand::Forward);
+  EXPECT_EQ(snapshot.last_cleaner, CleanerCommand::On);
+  for (const std::string& call : fixture.log.calls) {
+    EXPECT_NE(call, "motor.backward") << "Right turn with clear front backed up";
+  }
+}
+
+// [CHG-001][Option C] dead-end: 우회전 후에도 전방이 막혀 있으면(전+좌+우 모두
+// 막힘) 곧장 후진하지 않는다. 우회전으로 등진 좌측 장애물로 후진해 들이받지
+// 않도록, 먼저 좌회전으로 원래 진행 방향을 복원한 뒤 열린 뒤쪽으로 후진하고,
+// 후진 완료 후 좌측을 다시 확인한다.
+TEST(RvcControllerTest, DeadEndAfterRightTurnRecoversHeadingThenBacksUpThenRechecksLeft) {
+  ControllerFixture fixture;
+  fixture.controller.PressPowerButton();
+  fixture.controller.FrontObstacleDetected();
+  fixture.controller.SideSensorUpdated(true);
+  fixture.controller.MotionCompleted(MotionCommand::TurnRight);
+  fixture.log.calls.clear();
+
+  // 우회전 후의 전방마저 막혀 있음 -> dead-end -> 먼저 좌회전으로 원래 방향 복원.
+  fixture.controller.FrontObstacleDetected();
+  EXPECT_EQ(fixture.controller.Snapshot().last_motion, MotionCommand::TurnLeft);
+  EXPECT_EQ(fixture.log.calls, std::vector<std::string>{"motor.turnLeft"});
+
+  // 원래 방향 복원(좌회전) 완료 -> 열린 뒤쪽(왔던 칸)으로 안전하게 후진.
+  fixture.log.calls.clear();
+  fixture.controller.MotionCompleted(MotionCommand::TurnLeft);
   EXPECT_EQ(fixture.controller.Snapshot().last_motion, MotionCommand::Backward);
   EXPECT_EQ(fixture.log.calls, std::vector<std::string>{"motor.backward"});
+
+  // 후진 완료 -> 좌측 센서 재확인.
+  fixture.log.calls.clear();
+  fixture.controller.MotionCompleted(MotionCommand::Backward);
+  EXPECT_EQ(fixture.log.calls, std::vector<std::string>{"side.request"});
+}
+
+// [CHG-001] 좌회전 경로에서는 우회전 fallback 표시가 서지 않으므로, 이후
+// 전방 장애물은 dead-end(후진)가 아니라 일반 회피(좌측 재확인)로 처리된다.
+TEST(RvcControllerTest, LeftTurnPathDoesNotTriggerDeadEndBackward) {
+  ControllerFixture fixture;
+  fixture.controller.PressPowerButton();
+  fixture.controller.FrontObstacleDetected();
+  fixture.controller.SideSensorUpdated(false);  // turn left
+  fixture.log.calls.clear();
+
+  fixture.controller.FrontObstacleDetected();
+
+  EXPECT_EQ(fixture.controller.Snapshot().last_motion, MotionCommand::TurnLeft);
+  EXPECT_EQ(fixture.log.calls,
+            (std::vector<std::string>{"timer.cancel", "cleaner.off",
+                                      "side.request"}));
 }
 
 TEST(RvcControllerTest, BackwardCompletionRequestsSideCheckAgain) {
@@ -260,7 +331,7 @@ TEST(RvcControllerTest, NonMatchingStateEventsAreIgnored) {
   fixture.controller.PressPowerButton();
   fixture.log.calls.clear();
 
-  fixture.controller.SideSensorUpdated(false, false);
+  fixture.controller.SideSensorUpdated(false);
   fixture.controller.PowerUpTimerExpired();
   fixture.controller.MotionCompleted(MotionCommand::TurnLeft);
   fixture.controller.DustDetected();
@@ -286,22 +357,6 @@ TEST(RvcControllerTest, MotionCompletionIgnoresUnsupportedAvoidanceMotions) {
   EXPECT_TRUE(fixture.log.calls.empty());
 }
 
-TEST(RvcControllerTest, TurnRightCompletionAlsoResumesForwardCleaning) {
-  ControllerFixture fixture;
-  fixture.controller.PressPowerButton();
-  fixture.controller.FrontObstacleDetected();
-  fixture.log.calls.clear();
-
-  fixture.controller.MotionCompleted(MotionCommand::TurnRight);
-
-  const ControllerSnapshot snapshot = fixture.controller.Snapshot();
-  EXPECT_EQ(snapshot.cleaning_state, CleaningState::CleaningForward);
-  EXPECT_EQ(snapshot.last_motion, MotionCommand::Forward);
-  EXPECT_EQ(snapshot.last_cleaner, CleanerCommand::On);
-  EXPECT_EQ(fixture.log.calls,
-            (std::vector<std::string>{"motor.forward", "cleaner.on"}));
-}
-
 TEST(RvcControllerTest, CompatibilityUpdateStillMapsSensorInput) {
   ControllerFixture fixture;
   SensorInput input;
@@ -311,6 +366,7 @@ TEST(RvcControllerTest, CompatibilityUpdateStillMapsSensorInput) {
 
   const ControlCommand command = fixture.controller.Update(input);
 
+  // [CHG-001] 전방+좌측 막힘 -> 우회전(fallback). (우측 센서 없음)
   EXPECT_EQ(command.motion, MotionCommand::TurnRight);
   EXPECT_EQ(command.cleaner, CleanerCommand::PowerUp);
 }
@@ -329,12 +385,12 @@ TEST(RvcControllerTest, CompatibilityUpdateCoversAllBasicMotionChoices) {
   EXPECT_EQ(command.motion, MotionCommand::TurnLeft);
   EXPECT_EQ(command.cleaner, CleanerCommand::On);
 
-  SensorInput both_sides_blocked;
-  both_sides_blocked.front_obstacle = true;
-  both_sides_blocked.left_obstacle = true;
-  both_sides_blocked.right_obstacle = true;
-  command = fixture.controller.Update(both_sides_blocked);
-  EXPECT_EQ(command.motion, MotionCommand::Backward);
+  // [CHG-001] 전방+좌측 막힘 -> 우회전 (이전 Backward 분기 제거).
+  SensorInput front_and_left_blocked;
+  front_and_left_blocked.front_obstacle = true;
+  front_and_left_blocked.left_obstacle = true;
+  command = fixture.controller.Update(front_and_left_blocked);
+  EXPECT_EQ(command.motion, MotionCommand::TurnRight);
   EXPECT_EQ(command.cleaner, CleanerCommand::On);
 }
 
@@ -357,13 +413,12 @@ TEST(RvcControllerTest, ControllerStateAccessorsAndMutators) {
   EXPECT_EQ(state.CurrentCleaningState(), CleaningState::AvoidingObstacle);
 }
 
-TEST(RvcControllerTest, ObstacleAvoidancePolicySelectsLeftFirstThenRightThenBackward) {
+// [CHG-001] 좌측 센서 하나로만 회전 방향을 결정한다.
+TEST(RvcControllerTest, ObstacleAvoidancePolicySelectsLeftThenRight) {
   ObstacleAvoidancePolicy policy;
 
-  EXPECT_EQ(policy.SelectMotion(false, false), MotionCommand::TurnLeft);
-  EXPECT_EQ(policy.SelectMotion(false, true), MotionCommand::TurnLeft);
-  EXPECT_EQ(policy.SelectMotion(true, false), MotionCommand::TurnRight);
-  EXPECT_EQ(policy.SelectMotion(true, true), MotionCommand::Backward);
+  EXPECT_EQ(policy.SelectMotion(false), MotionCommand::TurnLeft);
+  EXPECT_EQ(policy.SelectMotion(true), MotionCommand::TurnRight);
 }
 
 TEST(RvcControllerTest, ToStringCoversAllEnumValues) {

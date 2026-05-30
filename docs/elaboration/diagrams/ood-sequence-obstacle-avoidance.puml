@@ -1,8 +1,9 @@
 @startuml
 title OOD Sequence - Obstacle Avoidance
 
+' [CHG-001] Right Sensor 제거: SideSensorUpdated(leftBlocked), 좌측 막힘 -> 우회전 -> 전방 재확인
 actor "Front Sensor" as FrontSensor
-actor "Side Sensors" as SideSensors
+actor "Left Sensor" as LeftSensor
 actor MotorEvent
 actor User
 participant "RvcController" as Controller
@@ -10,6 +11,7 @@ participant "ControllerState" as State
 participant "TimerPort" as Timer
 participant "CleanerPort" as Cleaner
 participant "ObstacleAvoidancePolicy" as Policy
+participant "FrontSensorPort" as FrontSensorPort
 participant "SideSensorPort" as SideSensor
 participant "MotorPort" as Motor
 
@@ -21,34 +23,43 @@ Controller -> Cleaner: TurnOff()
 Controller -> State: SetCleaningState(AvoidingObstacle)
 Controller -> SideSensor: RequestSideCheck()
 
-SideSensors -> Controller: SideSensorUpdated(leftBlocked, rightBlocked)
+LeftSensor -> Controller: SideSensorUpdated(leftBlocked)
 Controller -> State: IsAvoidingObstacle()
 State --> Controller: true
-Controller -> Policy: SelectMotion(leftBlocked, rightBlocked)
+Controller -> Policy: SelectMotion(leftBlocked)
 
 alt left side is clear
   Policy --> Controller: TurnLeft
   Controller -> Motor: TurnLeft()
-else left blocked and right clear
-  Policy --> Controller: TurnRight
-  Controller -> Motor: TurnRight()
-else both sides are blocked
-  Policy --> Controller: Backward
-  Controller -> Motor: Backward()
-  MotorEvent -> Controller: MotionCompleted(Backward)
-  Controller -> State: IsAvoidingObstacle()
-  State --> Controller: true
-  Controller -> SideSensor: RequestSideCheck()
-end
-
-alt turn motion completed
-  MotorEvent -> Controller: MotionCompleted(TurnLeft or TurnRight)
-  Controller -> State: IsAvoidingObstacle()
-  State --> Controller: true
-  Controller -> State: SetCleaningState(CleaningForward)
+  MotorEvent -> Controller: MotionCompleted(TurnLeft)
+  Controller -> Controller: ResumeForwardCleaning()
   Controller -> Motor: Forward()
   Controller -> Cleaner: TurnOn()
-else user powers off during avoidance
+else left side is blocked
+  Policy --> Controller: TurnRight
+  note right of Controller #BBDEFB : (변경) 우측 센서 없음. 좌측 막힘 -> 우회전 후 전방으로 우측 가용 여부 간접 확인. right_turn_attempted_ = true
+  Controller -> Motor: TurnRight()
+  MotorEvent -> Controller: MotionCompleted(TurnRight)
+  Controller -> FrontSensorPort: RequestFrontCheck()
+  alt front clear after right turn
+    note right of Controller #C8E6C9 : (추가) 우측이 열려 있던 경우 -> 후진 없이 복귀
+    FrontSensor -> Controller: FrontPathClear()
+    Controller -> Controller: ResumeForwardCleaning()
+    Controller -> Motor: Forward()
+    Controller -> Cleaner: TurnOn()
+  else front still blocked (dead-end)
+    note right of Controller #BBDEFB : (변경) right_turn_attempted_ == true 이면 dead-end.\n우회전으로 등진 좌측 장애물로 후진하지 않도록\n먼저 좌회전으로 원래 방향 복원 -> 그다음 후진
+    FrontSensor -> Controller: FrontObstacleDetected()
+    Controller -> Motor: TurnLeft()
+    MotorEvent -> Controller: MotionCompleted(TurnLeft)
+    note right of Controller #C8E6C9 : (추가) 복원용 좌회전 완료(right_turn_attempted_==true)\n-> 열린 뒤쪽으로 안전하게 후진. 플래그 해제
+    Controller -> Motor: Backward()
+    MotorEvent -> Controller: MotionCompleted(Backward)
+    Controller -> SideSensor: RequestSideCheck()
+  end
+end
+
+alt user powers off during avoidance
   User -> Controller: PressPowerButton()
   Controller -> Timer: CancelPowerUpTimer()
   Controller -> Motor: Stop()

@@ -32,10 +32,10 @@ enum class CleanerCommand {
   PowerUp,
 };
 
+// [CHG-001] Right Sensor 제거: right_obstacle 필드 삭제 (Front + Left 센서만 사용)
 struct SensorInput {
   bool front_obstacle{false};
   bool left_obstacle{false};
-  bool right_obstacle{false};
   bool dust_detected{false};
 };
 
@@ -104,9 +104,13 @@ class ControllerState {
   CleaningState cleaning_state_{CleaningState::PoweredOff};
 };
 
+// [CHG-001][Option C] Right Sensor 제거: 좌측 센서 하나로만 회전 방향 결정.
+// left clear -> TurnLeft, left blocked -> TurnRight (우측 센서 없는 fallback).
+// dead-end(우회전 후 전방까지 막힘)는 RvcController가 좌회전(원래 방향 복원)
+// 후 후진으로 처리한다.
 class ObstacleAvoidancePolicy {
  public:
-  MotionCommand SelectMotion(bool left_blocked, bool right_blocked) const;
+  MotionCommand SelectMotion(bool left_blocked) const;
 };
 
 class RvcController {
@@ -117,7 +121,8 @@ class RvcController {
   void PressPowerButton();
   void FrontObstacleDetected();
   void FrontPathClear();
-  void SideSensorUpdated(bool left_blocked, bool right_blocked);
+  // [CHG-001] Right Sensor 제거: left_blocked 하나만 받는다.
+  void SideSensorUpdated(bool left_blocked);
   void DustDetected();
   void PowerUpTimerExpired();
   void MotionCompleted(MotionCommand motion);
@@ -142,6 +147,11 @@ class RvcController {
   ObstacleAvoidancePolicy avoidance_policy_;
   MotionCommand last_motion_{MotionCommand::Stop};
   CleanerCommand last_cleaner_{CleanerCommand::Off};
+  // [CHG-001][Option C] 좌측이 막혀 우회전(fallback)을 시도했는지 추적한다.
+  // 우회전 후 전방이 여전히 막혀 있으면(dead-end) 먼저 좌회전으로 원래 진행
+  // 방향을 복원한 뒤(이 플래그로 복원용 좌회전과 일반 좌회피를 구분), 열린
+  // 뒤쪽으로 안전하게 후진한다.
+  bool right_turn_attempted_{false};
 };
 
 std::string ToString(PowerState state);

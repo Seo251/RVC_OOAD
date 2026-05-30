@@ -6,9 +6,9 @@
     "map_03_start_front_blocked": {"size": 8, "robot": [3, 3], "obstacles": [[3, 2]], "dust": []},
     "map_04_left_clear": {"size": 8, "robot": [3, 3], "obstacles": [[3, 2], [4, 3]], "dust": []},
     "map_05_right_clear": {"size": 8, "robot": [3, 3], "obstacles": [[3, 2], [2, 3]], "dust": []},
-    "map_06_both_blocked_then_left": {"size": 8, "robot": [3, 3], "obstacles": [[3, 2], [2, 3], [4, 3], [4, 4]], "dust": []},
-    "map_07_both_blocked_then_right": {"size": 8, "robot": [3, 3], "obstacles": [[3, 2], [2, 3], [4, 3], [2, 4]], "dust": []},
-    "map_08_repeated_backward": {"size": 8, "robot": [3, 3], "obstacles": [[3, 2], [2, 3], [4, 3], [2, 4], [4, 4]], "dust": []},
+    "map_06_dead_end_escapes_south": {"size": 8, "robot": [3, 3], "obstacles": [[3, 2], [2, 3], [4, 3]], "dust": []},
+    "map_07_dead_end_then_dust": {"size": 8, "robot": [3, 3], "obstacles": [[3, 2], [2, 3], [4, 3]], "dust": [[2, 4]]},
+    "map_08_sequential_left_avoidance": {"size": 8, "robot": [3, 3], "obstacles": [[3, 2], [1, 3]], "dust": []},
     "map_09_dust_start": {"size": 8, "robot": [3, 3], "obstacles": [], "dust": [[3, 2]]},
     "map_10_dust_timeout": {"size": 8, "robot": [3, 3], "obstacles": [], "dust": [[3, 2]]},
     "map_11_duplicate_dust": {"size": 8, "robot": [3, 3], "obstacles": [], "dust": [[3, 2], [3, 1]]},
@@ -67,59 +67,66 @@
       "steps": [
         {"op": "pressPowerButton"},
         {"op": "frontObstacleDetected"},
-        {"op": "sideSensorUpdated", "leftBlocked": false, "rightBlocked": true, "expect": {"cleaningState": "AvoidingObstacle", "lastMotion": "TurnLeft", "lastCleaner": "Off"}},
+        {"op": "sideSensorUpdated", "leftBlocked": false, "expect": {"cleaningState": "AvoidingObstacle", "lastMotion": "TurnLeft", "lastCleaner": "Off"}},
         {"op": "motionCompleted", "motion": "TurnLeft"}
       ],
       "expected": {"powerState": "On", "cleaningState": "CleaningForward", "lastMotion": "Forward", "lastCleaner": "On"}
     },
     {
-      "name": "05 obstacle avoidance turns right when only right is clear",
+      "name": "05 left blocked turns right then front clears (right was open)",
       "map": "map_05_right_clear",
       "steps": [
         {"op": "pressPowerButton"},
         {"op": "frontObstacleDetected"},
-        {"op": "sideSensorUpdated", "leftBlocked": true, "rightBlocked": false, "expect": {"cleaningState": "AvoidingObstacle", "lastMotion": "TurnRight", "lastCleaner": "Off"}},
-        {"op": "motionCompleted", "motion": "TurnRight"}
+        {"op": "sideSensorUpdated", "leftBlocked": true, "expect": {"cleaningState": "AvoidingObstacle", "lastMotion": "TurnRight", "lastCleaner": "Off"}},
+        {"op": "motionCompleted", "motion": "TurnRight", "expect": {"cleaningState": "AvoidingObstacle", "lastMotion": "TurnRight", "lastCleaner": "Off"}},
+        {"op": "frontPathClear"}
       ],
       "expected": {"powerState": "On", "cleaningState": "CleaningForward", "lastMotion": "Forward", "lastCleaner": "On"}
     },
     {
-      "name": "06 both sides blocked backs up then turns left",
-      "map": "map_06_both_blocked_then_left",
+      "name": "06 dead-end (front+left+right blocked) recovers heading, backs up, then escapes",
+      "map": "map_06_dead_end_escapes_south",
       "steps": [
         {"op": "pressPowerButton"},
-        {"op": "frontObstacleDetected"},
-        {"op": "sideSensorUpdated", "leftBlocked": true, "rightBlocked": true, "expect": {"cleaningState": "AvoidingObstacle", "lastMotion": "Backward", "lastCleaner": "Off"}},
-        {"op": "motionCompleted", "motion": "Backward", "expect": {"cleaningState": "AvoidingObstacle", "lastMotion": "Backward", "lastCleaner": "Off"}},
-        {"op": "sideSensorUpdated", "leftBlocked": false, "rightBlocked": true},
+        {"op": "frontObstacleDetected", "expect": {"cleaningState": "AvoidingObstacle", "lastCleaner": "Off"}},
+        {"op": "sideSensorUpdated", "leftBlocked": true, "expect": {"cleaningState": "AvoidingObstacle", "lastMotion": "TurnRight", "lastCleaner": "Off"}},
+        {"op": "motionCompleted", "motion": "TurnRight"},
+        {"op": "frontObstacleDetected", "expect": {"cleaningState": "AvoidingObstacle", "lastMotion": "TurnLeft", "lastCleaner": "Off"}},
+        {"op": "motionCompleted", "motion": "TurnLeft", "expect": {"cleaningState": "AvoidingObstacle", "lastMotion": "Backward", "lastCleaner": "Off"}},
+        {"op": "motionCompleted", "motion": "Backward"},
+        {"op": "sideSensorUpdated", "leftBlocked": false, "expect": {"cleaningState": "AvoidingObstacle", "lastMotion": "TurnLeft", "lastCleaner": "Off"}},
         {"op": "motionCompleted", "motion": "TurnLeft"}
       ],
       "expected": {"powerState": "On", "cleaningState": "CleaningForward", "lastMotion": "Forward", "lastCleaner": "On"}
     },
     {
-      "name": "07 both sides blocked backs up then turns right",
-      "map": "map_07_both_blocked_then_right",
+      "name": "07 dead-end recovers heading and backs up, then escapes left onto dust and powers up",
+      "map": "map_07_dead_end_then_dust",
       "steps": [
         {"op": "pressPowerButton"},
-        {"op": "frontObstacleDetected"},
-        {"op": "sideSensorUpdated", "leftBlocked": true, "rightBlocked": true},
+        {"op": "frontObstacleDetected", "expect": {"cleaningState": "AvoidingObstacle", "lastCleaner": "Off"}},
+        {"op": "sideSensorUpdated", "leftBlocked": true, "expect": {"lastMotion": "TurnRight"}},
+        {"op": "motionCompleted", "motion": "TurnRight"},
+        {"op": "frontObstacleDetected", "expect": {"lastMotion": "TurnLeft"}},
+        {"op": "motionCompleted", "motion": "TurnLeft", "expect": {"lastMotion": "Backward"}},
         {"op": "motionCompleted", "motion": "Backward"},
-        {"op": "sideSensorUpdated", "leftBlocked": true, "rightBlocked": false},
-        {"op": "motionCompleted", "motion": "TurnRight"}
+        {"op": "sideSensorUpdated", "leftBlocked": false, "expect": {"lastMotion": "TurnLeft"}},
+        {"op": "motionCompleted", "motion": "TurnLeft", "expect": {"cleaningState": "CleaningForward", "lastMotion": "Forward", "lastCleaner": "On"}},
+        {"op": "dustDetected"}
       ],
-      "expected": {"powerState": "On", "cleaningState": "CleaningForward", "lastMotion": "Forward", "lastCleaner": "On"}
+      "expected": {"powerState": "On", "cleaningState": "PowerUpCleaning", "lastMotion": "Forward", "lastCleaner": "PowerUp"}
     },
     {
-      "name": "08 repeated backward while both sides remain blocked",
-      "map": "map_08_repeated_backward",
+      "name": "08 two obstacles in a row are each avoided to the left",
+      "map": "map_08_sequential_left_avoidance",
       "steps": [
         {"op": "pressPowerButton"},
-        {"op": "frontObstacleDetected"},
-        {"op": "sideSensorUpdated", "leftBlocked": true, "rightBlocked": true},
-        {"op": "motionCompleted", "motion": "Backward"},
-        {"op": "sideSensorUpdated", "leftBlocked": true, "rightBlocked": true, "expect": {"cleaningState": "AvoidingObstacle", "lastMotion": "Backward", "lastCleaner": "Off"}},
-        {"op": "motionCompleted", "motion": "Backward"},
-        {"op": "sideSensorUpdated", "leftBlocked": false, "rightBlocked": true},
+        {"op": "frontObstacleDetected", "expect": {"cleaningState": "AvoidingObstacle", "lastCleaner": "Off"}},
+        {"op": "sideSensorUpdated", "leftBlocked": false, "expect": {"lastMotion": "TurnLeft"}},
+        {"op": "motionCompleted", "motion": "TurnLeft", "expect": {"cleaningState": "CleaningForward", "lastMotion": "Forward", "lastCleaner": "On"}},
+        {"op": "frontObstacleDetected", "expect": {"cleaningState": "AvoidingObstacle", "lastCleaner": "Off"}},
+        {"op": "sideSensorUpdated", "leftBlocked": false, "expect": {"lastMotion": "TurnLeft"}},
         {"op": "motionCompleted", "motion": "TurnLeft"}
       ],
       "expected": {"powerState": "On", "cleaningState": "CleaningForward", "lastMotion": "Forward", "lastCleaner": "On"}
@@ -202,7 +209,7 @@
       "steps": [
         {"op": "pressPowerButton"},
         {"op": "frontPathClear"},
-        {"op": "sideSensorUpdated", "leftBlocked": false, "rightBlocked": false}
+        {"op": "sideSensorUpdated", "leftBlocked": false}
       ],
       "expected": {"powerState": "On", "cleaningState": "CleaningForward", "lastMotion": "Forward", "lastCleaner": "On"}
     },
@@ -298,12 +305,12 @@
       "expected": {"powerState": "On", "cleaningState": "AvoidingObstacle", "lastMotion": "Stop", "lastCleaner": "Off"}
     },
     {
-      "name": "26 both side clear still prefers left",
+      "name": "26 left clear turns left during avoidance",
       "map": "map_26_both_clear_prefers_left",
       "steps": [
         {"op": "pressPowerButton"},
         {"op": "frontObstacleDetected"},
-        {"op": "sideSensorUpdated", "leftBlocked": false, "rightBlocked": false}
+        {"op": "sideSensorUpdated", "leftBlocked": false}
       ],
       "expected": {"powerState": "On", "cleaningState": "AvoidingObstacle", "lastMotion": "TurnLeft", "lastCleaner": "Off"}
     },
@@ -347,8 +354,9 @@
       "steps": [
         {"op": "pressPowerButton"},
         {"op": "frontObstacleDetected"},
-        {"op": "sideSensorUpdated", "leftBlocked": true, "rightBlocked": false},
+        {"op": "sideSensorUpdated", "leftBlocked": true},
         {"op": "motionCompleted", "motion": "TurnRight"},
+        {"op": "frontPathClear"},
         {"op": "dustDetected"}
       ],
       "expected": {"powerState": "On", "cleaningState": "PowerUpCleaning", "lastMotion": "Forward", "lastCleaner": "PowerUp"}

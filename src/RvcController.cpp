@@ -36,15 +36,11 @@ void ControllerState::SetCleaningState(CleaningState state) {
   cleaning_state_ = state;
 }
 
+// [CHG-001] Right Sensor 제거: 좌측 센서 하나로 회전 방향만 결정한다.
+// 좌측이 비면 좌회전, 막혀 있으면 우회전(우측 센서가 없는 fallback).
 MotionCommand ObstacleAvoidancePolicy::SelectMotion(
-    const bool left_blocked, const bool right_blocked) const {
-  if (!left_blocked) {
-    return MotionCommand::TurnLeft;
-  }
-  if (!right_blocked) {
-    return MotionCommand::TurnRight;
-  }
-  return MotionCommand::Backward;
+    const bool left_blocked) const {
+  return left_blocked ? MotionCommand::TurnRight : MotionCommand::TurnLeft;
 }
 
 RvcController::RvcController(MotorPort& motor, CleanerPort& cleaner,
@@ -72,10 +68,23 @@ void RvcController::FrontObstacleDetected() {
     return;
   }
 
+  // [CHG-001][Option C] Dead-end: 좌측이 막혀 우회전을 시도했는데 회전 후의
+  // 전방마저 막혀 있다면(전방+좌측+우측 모두 막힘) 곧장 후진하지 않는다.
+  // 우회전으로 이미 방향을 틀었으므로 그대로 후진하면 방금 등진 좌측
+  // 장애물로 들이받는다. 따라서 먼저 좌회전으로 원래 진행 방향을 복원하고,
+  // 복원 완료(MotionCompleted)에서 열려 있는 뒤쪽(왔던 칸)으로 안전하게
+  // 후진한다. right_turn_attempted_는 그대로 두어 복원 완료를 구분한다.
+  if (state_.IsAvoidingObstacle() && right_turn_attempted_) {
+    motor_.TurnLeft();
+    SetLastMotion(MotionCommand::TurnLeft);
+    return;
+  }
+
   timer_.CancelPowerUpTimer();
   cleaner_.TurnOff();
   SetLastCleaner(CleanerCommand::Off);
   state_.SetCleaningState(CleaningState::AvoidingObstacle);
+  right_turn_attempted_ = false;
   side_sensor_.RequestSideCheck();
 }
 
@@ -93,28 +102,22 @@ void RvcController::FrontPathClear() {
   ResumeForwardCleaning();
 }
 
-void RvcController::SideSensorUpdated(const bool left_blocked,
-                                      const bool right_blocked) {
+// [CHG-001] Right Sensor 제거: 좌측 센서 결과만으로 좌회전/우회전을 결정한다.
+void RvcController::SideSensorUpdated(const bool left_blocked) {
   if (!state_.IsAvoidingObstacle()) {
     return;
   }
 
-  const MotionCommand motion =
-      avoidance_policy_.SelectMotion(left_blocked, right_blocked);
+  const MotionCommand motion = avoidance_policy_.SelectMotion(left_blocked);
 
-  switch (motion) {
-    case MotionCommand::TurnLeft:
-      motor_.TurnLeft();
-      break;
-    case MotionCommand::TurnRight:
-      motor_.TurnRight();
-      break;
-    case MotionCommand::Backward:
-      motor_.Backward();
-      break;
-    case MotionCommand::Stop:
-    case MotionCommand::Forward:
-      return;
+  if (motion == MotionCommand::TurnRight) {
+    motor_.TurnRight();
+    // 우측이 비었는지 모르는 채 시도하는 fallback 회전. 완료 후 전방을
+    // 재확인해 dead-end(후진) 여부를 판단하기 위해 표시해 둔다.
+    right_turn_attempted_ = true;
+  } else {
+    motor_.TurnLeft();
+    right_turn_attempted_ = false;
   }
 
   SetLastMotion(motion);
@@ -151,13 +154,33 @@ void RvcController::MotionCompleted(const MotionCommand motion) {
     return;
   }
 
-  if (motion == MotionCommand::Backward) {
-    side_sensor_.RequestSideCheck();
-    return;
-  }
-
-  if (motion == MotionCommand::TurnLeft || motion == MotionCommand::TurnRight) {
-    ResumeForwardCleaning();
+  switch (motion) {
+    case MotionCommand::Backward:
+      // 후진 완료 -> 좌측 센서를 다시 확인해 회피를 재시작한다.
+      side_sensor_.RequestSideCheck();
+      break;
+    case MotionCommand::TurnLeft:
+      if (right_turn_attempted_) {
+        // [CHG-001][Option C] dead-end 복귀용 좌회전 완료 -> 원래 진행 방향으로
+        // 돌아왔으니 이제 열려 있는 뒤쪽(왔던 칸)으로 안전하게 후진한다.
+        right_turn_attempted_ = false;
+        motor_.Backward();
+        SetLastMotion(MotionCommand::Backward);
+      } else {
+        // 좌측이 비어 좌회전했으므로 바로 전진 청소로 복귀한다.
+        ResumeForwardCleaning();
+      }
+      break;
+    case MotionCommand::TurnRight:
+      // [CHG-001][Option C] fallback 우회전 완료 -> 전방을 재확인한다.
+      // 전방이 비면 FrontPathClear()로 복귀(우측이 열려 있던 경우, 후진 없음),
+      // 막혀 있으면 FrontObstacleDetected()가 dead-end로 보고 좌회전으로
+      // 원래 방향 복원 후 후진한다.
+      front_sensor_.RequestFrontCheck();
+      break;
+    case MotionCommand::Stop:
+    case MotionCommand::Forward:
+      break;
   }
 }
 
@@ -184,12 +207,9 @@ ControlCommand RvcController::Update(const SensorInput& input) const {
     return command;
   }
 
-  if (!input.right_obstacle) {
-    command.motion = MotionCommand::TurnRight;
-    return command;
-  }
-
-  command.motion = MotionCommand::Backward;
+  // [CHG-001] Right Sensor 제거: 좌측이 막히면 우회전(fallback). dead-end 후진은
+  // 순차적 전방 재확인이 필요하므로 one-shot 헬퍼에서는 표현하지 않는다.
+  command.motion = MotionCommand::TurnRight;
   return command;
 }
 
@@ -207,6 +227,7 @@ void RvcController::ResumeForwardCleaning() {
   cleaner_.TurnOn();
   SetLastMotion(MotionCommand::Forward);
   SetLastCleaner(CleanerCommand::On);
+  right_turn_attempted_ = false;
 }
 
 void RvcController::PowerOffSafely() {
@@ -217,6 +238,7 @@ void RvcController::PowerOffSafely() {
   SetLastCleaner(CleanerCommand::Off);
   state_.SetCleaningState(CleaningState::PoweredOff);
   state_.SetPowerState(PowerState::Off);
+  right_turn_attempted_ = false;
 }
 
 std::string ToString(const PowerState state) {

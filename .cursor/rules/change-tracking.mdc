@@ -1,0 +1,119 @@
+---
+description: 요구사항 변경 시 SRS/SDD/CODE/UT 산출물의 추가·삭제·변경을 색상으로 표시하는 규칙
+alwaysApply: true
+---
+
+# Change Tracking (SRS / SDD / CODE / UT)
+
+요구사항 변경으로 산출물을 수정할 때, **기존 내용과 수정 내용을 한눈에 구분**할 수 있도록 색상 표기를 적용한다.
+
+## 적용 범위
+
+| 산출물 | 대표 경로 |
+| --- | --- |
+| SRS | `docs/inception/requirements.md`, `docs/elaboration/use-case-details.md` |
+| SDD | `docs/elaboration/diagrams/*.puml`, `docs/inception/diagrams/*.puml` |
+| CODE | `src/**`, `include/**`, `apps/**` |
+| UT | `tests/**` |
+
+SRS·SDD·CODE·UT 중 **하나라도** 추가·삭제·변경이 발생하면, 연관된 다른 산출물도 같은 변경 ID로 함께 추적한다.
+
+## 색상 규칙
+
+| 구분 | 색 | 의미 | 표기 |
+| --- | --- | --- | --- |
+| **삭제** | 빨간색 | 더 이상 유효하지 않은 내용 | `<span style="color:#c62828">...</span>` 또는 `~~삭제된 텍스트~~` |
+| **추가** | 초록색 | 새로 도입된 내용 | `<span style="color:#2e7d32">...</span>` |
+| **변경** | 파란색 | 의미·동작·표기가 바뀐 내용 | `<span style="color:#1565c0">변경 후</span>` (필요 시 `<span style="color:#c62828">변경 전</span>` → `<span style="color:#1565c0">변경 후</span>`) |
+
+### Markdown / 문서 (SRS, SDD 설명문)
+
+```markdown
+<!-- [CHG-001] FR-015 power-up duration -->
+- ~~5초 동안 cleaner 흡입력 증가~~
+- <span style="color:#2e7d32">3초 동안 cleaner 흡입력 증가 (motor 전진 유지)</span>
+```
+
+변경(수정)은 **변경 전(빨간색/취소선) + 변경 후(파란색)** 를 한 줄 또는 인접 줄에 함께 둔다.
+
+### PlantUML (SDD)
+
+주석으로 변경 ID와 구분을 남긴다. 다이어그램 본문 색은 `skinparam` 또는 `#color`로 구분한다.
+
+```plantuml
+' [CHG-001] deleted
+' note right #FFCDD2 : (삭제) 5-second timer
+
+' [CHG-001] added
+note right #C8E6C9 : (추가) 3-second timer, motor keeps Forward
+
+' [CHG-001] changed
+note right #BBDEFB : (변경) Left -> TurnLeft
+```
+
+| PlantUML 배경색 | 의미 |
+| --- | --- |
+| `#FFCDD2` (연한 빨강) | 삭제 |
+| `#C8E6C9` (연한 초록) | 추가 |
+| `#BBDEFB` (연한 파랑) | 변경 |
+
+### C++ CODE
+
+소스 파일 본문에 HTML 색상 태그를 넣지 않는다. 대신 **변경 요약 주석** 또는 PR/변경 로그에 색상 Markdown을 사용한다.
+
+```cpp
+// [CHG-001][changed] kPowerUpDurationSeconds: 5 -> 3
+constexpr int kPowerUpDurationSeconds = 3;
+```
+
+코드 diff 자체는 Git diff(빨강/초록)로 확인하고, rule의 색상 의미와 대응시킨다.
+
+- Git diff `-` (삭제) = **빨간색(삭제)**
+- Git diff `+` (추가) = **초록색(추가)**
+- 동일 블록 내 의미 변경 = **파란색(변경)** 으로 변경 로그에 명시
+
+### Unit Test (UT)
+
+테스트 코드에도 HTML 색상 태그를 넣지 않는다. 테스트명·주석·변경 로그로 추적한다.
+
+```cpp
+// [CHG-001][added] Duplicate dust restarts 3-second timer (FR-021)
+TEST(RvcControllerTest, DuplicateDustRestartsThreeSecondTimerAndKeepsState) {
+```
+
+## 변경 ID
+
+요구사항 변경 1건당 하나의 ID를 부여한다.
+
+```text
+CHG-001  FR-015/016  power-up 5s -> 3s, motor independence
+CHG-002  NFR-011     motor/cleaner output independence
+```
+
+동일 ID를 SRS, SDD, CODE, UT 수정에 **같은 ID로 반복**하여 traceability를 유지한다.
+
+## 작업 순서 (요구사항 변경 시)
+
+1. 변경 ID 부여 (`CHG-NNN`)
+2. SRS에서 FR/NFR/UC 수정 (색상 표기)
+3. SDD(PlantUML, use-case-details) 반영 (색상/note)
+4. CODE 구현
+5. UT 추가·수정
+6. (선택) `docs/reports/changelog.md`에 변경 ID별 요약表 작성
+
+## Must
+
+- 삭제·추가·변경을 **색상 규칙 없이 묵시적으로 덮어쓰지 않는다**
+- 연관 산출물(SRS↔SDD↔CODE↔UT) 중 하나만 고치고 나머지를 방치하지 않는다
+- 변경 ID를 SRS·SDD·CODE·UT 주석/노트에 남긴다
+
+## Must not
+
+- CODE/UT 소스에 HTML `<span>` 색상 태그를 삽입하지 않는다
+- 색상 표기 없이 대량 삭제·치환 후 “무엇이 바뀌었는지” 추적 불가 상태로 두지 않는다
+- PPT·Word 등 외부 문서에만 색상을 넣고 repo 산출물에는 변경 흔적을 남기지 않는다
+
+## Prefer
+
+- 최종 제출·발표용 문서(PPT/Word)에서도 동일 색상 규칙(빨강/초록/파랑)을 사용한다
+- 변경이 안정화되면 `changelog`에 정리하고, 임시 색상 markup은 다음 마일스톤에서 정리한다

@@ -1,13 +1,16 @@
 {
-  "name": "front obstacle both sides blocked then right clear",
+  "name": "front and left blocked turns right then dead-end recovers heading and backs up",
   "map": "../maps/obstacle_box.json",
   "steps": [
     {"op": "pressPowerButton"},
     {"op": "frontObstacleDetected"},
-    {"op": "sideSensorUpdated", "leftBlocked": true, "rightBlocked": true},
+    {"op": "sideSensorUpdated", "leftBlocked": true, "expect": {"cleaningState": "AvoidingObstacle", "lastMotion": "TurnRight", "lastCleaner": "Off"}},
+    {"op": "motionCompleted", "motion": "TurnRight"},
+    {"op": "frontObstacleDetected", "expect": {"cleaningState": "AvoidingObstacle", "lastMotion": "TurnLeft", "lastCleaner": "Off"}},
+    {"op": "motionCompleted", "motion": "TurnLeft", "expect": {"cleaningState": "AvoidingObstacle", "lastMotion": "Backward", "lastCleaner": "Off"}},
     {"op": "motionCompleted", "motion": "Backward"},
-    {"op": "sideSensorUpdated", "leftBlocked": true, "rightBlocked": false},
-    {"op": "motionCompleted", "motion": "TurnRight"}
+    {"op": "sideSensorUpdated", "leftBlocked": false},
+    {"op": "motionCompleted", "motion": "TurnLeft"}
   ],
   "expected": {
     "powerState": "On",

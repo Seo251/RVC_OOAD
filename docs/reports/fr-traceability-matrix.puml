@@ -33,12 +33,13 @@ package "FR / Use Case" as COL_FR #DCEEFF {
   card "FR-005\nForward + Clean On\n(UC-001)" as FR005
   card "FR-006\nStart Avoidance\n(UC-003)" as FR006
   card "FR-007\nCleaner Off\nDuring Avoidance" as FR007
-  card "FR-008\nCheck Left First" as FR008
+  ' [CHG-001/Option C] FR-008~013 labels updated for the 2-sensor avoidance flow
+  card "FR-008\nLeft Sensor\n(Left only)" as FR008 #BBDEFB
   card "FR-009\nTurn Left" as FR009
-  card "FR-010\nCheck Right" as FR010
-  card "FR-011\nTurn Right" as FR011
-  card "FR-012\nBackward Both\nBlocked" as FR012
-  card "FR-013\nTurn After\nBackward" as FR013
+  card "FR-010\nLeft Blocked\n-> Turn Right" as FR010 #BBDEFB
+  card "FR-011\nFront Re-check\nafter Right Turn" as FR011 #BBDEFB
+  card "FR-012\nFront Clear\n-> Resume" as FR012 #BBDEFB
+  card "FR-013\nDead-end ->\nTurnLeft + Backward" as FR013 #BBDEFB
   card "FR-014\nResume Forward\nCleaning" as FR014
   card "FR-015\nDust PowerUp 3s\nKeep Forward" as FR015
   card "FR-016\nNormalize Cleaner\nAfter 3s" as FR016
@@ -140,13 +141,16 @@ FR005 --> OP_FPC
 FR006 --> OP_FOD
 FR007 --> OP_FOD
 
+' [CHG-001/Option C] FR-008~013 -> operation mapping for the 2-sensor flow
 FR008 --> OP_SSU
 FR009 --> OP_SSU
 FR010 --> OP_SSU
-FR011 --> OP_SSU
+FR011 --> OP_MC
+FR011 --> OP_FOD
+FR011 --> OP_FPC
 
-FR012 --> OP_SSU
-FR013 --> OP_SSU
+FR012 --> OP_FPC
+FR013 --> OP_FOD
 FR013 --> OP_MC
 
 FR014 --> OP_MC
@@ -209,17 +213,23 @@ OP_FOD --> M_TOFF
 OP_FOD --> M_SLC
 OP_FOD --> M_SCS
 OP_FOD --> M_RSCHECK
+' [CHG-001/Option C] dead-end: FrontObstacleDetected issues the recovery TurnLeft
+OP_FOD --> M_TL
+OP_FOD --> M_SLM
 
 OP_SSU --> M_SSU
 OP_SSU --> M_SM
 OP_SSU --> M_TL
 OP_SSU --> M_TR
-OP_SSU --> M_BWD
 OP_SSU --> M_SLM
 
+' [CHG-001/Option C] MotionCompleted handles front re-check, recovery backward, resume
 OP_MC --> M_MC
 OP_MC --> M_RFC
 OP_MC --> M_RSCHECK
+OP_MC --> M_RFCHECK
+OP_MC --> M_BWD
+OP_MC --> M_SLM
 
 OP_DD --> M_DD
 OP_DD --> M_PUP
@@ -301,7 +311,7 @@ legend right
   | Method | C++ member function or port call |
   | Class | OOD Class Diagram class |
   ----
-  Unit Test: 24 GTest cases
+  Unit Test: 26 GTest cases
   System Test: 30 scenarios (rvc_30_system_tests.json)
 endlegend
 

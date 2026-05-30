@@ -240,8 +240,8 @@ std::string RvcSimulatorBridge::HandleCommand(const std::string& line) {
   } else if (Contains(line, "frontPathClear")) {
     controller_.FrontPathClear();
   } else if (Contains(line, "sideSensorUpdated")) {
-    controller_.SideSensorUpdated(ReadBoolField(line, "leftBlocked"),
-                                  ReadBoolField(line, "rightBlocked"));
+    // [CHG-001] Right Sensor 제거: leftBlocked 하나만 사용한다.
+    controller_.SideSensorUpdated(ReadBoolField(line, "leftBlocked"));
   } else if (Contains(line, "dustDetected")) {
     controller_.DustDetected();
   } else if (Contains(line, "powerUpTimerExpired")) {

@@ -35,8 +35,7 @@ body:
       placeholder: |
         1. Set front_obstacle=true.
         2. Set left_obstacle=true.
-        3. Set right_obstacle=true.
-        4. Call RvcController::Update().
+        3. Call RvcController::Update().
     validations:
       required: true
   - type: textarea

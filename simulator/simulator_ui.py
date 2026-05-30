@@ -93,12 +93,11 @@ class SimulatorUi:
             ("Power Button", self.press_power_button),
             ("Front Clear", lambda: self.send("frontPathClear")),
             ("Front Obstacle", lambda: self.send("frontObstacleDetected")),
+            # [CHG-001] Right Sensor 제거: 좌측 센서 하나만 사용.
             ("Left Clear", lambda: self.send(
-                "sideSensorUpdated", leftBlocked=False, rightBlocked=True)),
-            ("Right Clear", lambda: self.send(
-                "sideSensorUpdated", leftBlocked=True, rightBlocked=False)),
-            ("Both Blocked", lambda: self.send(
-                "sideSensorUpdated", leftBlocked=True, rightBlocked=True)),
+                "sideSensorUpdated", leftBlocked=False)),
+            ("Left Blocked", lambda: self.send(
+                "sideSensorUpdated", leftBlocked=True)),
             ("Dust Detected", lambda: self.send("dustDetected")),
             ("Timer Expired", lambda: self.send("powerUpTimerExpired")),
             ("Motion Done", self.complete_current_motion),
@@ -333,13 +332,9 @@ class SimulatorUi:
             self.send("frontPathClear")
 
     def send_side_sensor_from_map(self) -> None:
+        # [CHG-001] Right Sensor 제거: 좌측 셀만 읽어 leftBlocked로 전달한다.
         left_blocked = self.is_cell_blocked(self.left_cell())
-        right_blocked = self.is_cell_blocked(self.right_cell())
-        self.send(
-            "sideSensorUpdated",
-            leftBlocked=left_blocked,
-            rightBlocked=right_blocked,
-        )
+        self.send("sideSensorUpdated", leftBlocked=left_blocked)
 
     def is_cell_blocked(self, cell: tuple[int, int]) -> bool:
         if not self.is_inside_grid(cell):
@@ -356,9 +351,7 @@ class SimulatorUi:
         left = LEFT_TURN[self.heading]
         return (self.robot[0] + left[0], self.robot[1] + left[1])
 
-    def right_cell(self) -> tuple[int, int]:
-        right = RIGHT_TURN[self.heading]
-        return (self.robot[0] + right[0], self.robot[1] + right[1])
+    # [CHG-001] right_cell() 제거: 우측 센서가 없어 좌측 셀만 읽는다.
 
     # ------------------------------------------------------------------
     # Apply controller motor events to the visual robot
@@ -724,13 +717,9 @@ class SimulatorUi:
         return self.send("frontPathClear")
 
     def send_visual_side_sensor_from_map(self) -> dict[str, object] | None:
+        # [CHG-001] Right Sensor 제거: 좌측 셀만 읽어 leftBlocked로 전달한다.
         left_blocked = self.is_cell_blocked(self.left_cell())
-        right_blocked = self.is_cell_blocked(self.right_cell())
-        return self.send(
-            "sideSensorUpdated",
-            leftBlocked=left_blocked,
-            rightBlocked=right_blocked,
-        )
+        return self.send("sideSensorUpdated", leftBlocked=left_blocked)
 
     def send_visual_dust_sensor_from_map(self) -> dict[str, object] | None:
         if self.robot not in self.dust:

@@ -15,21 +15,27 @@ class RvcController {
 class SensorArray {
   readFront()
   readLeft()
-  readRight()
+  ' [CHG-001] deleted: readRight()
   readDust()
 }
 
 class FrontSensor
 class LeftSensor
-class RightSensor
+' [CHG-001] deleted: class RightSensor
 class DustSensor
 
 class SensorReading {
   frontObstacle
   leftObstacle
-  rightObstacle
+  ' [CHG-001] deleted: rightObstacle
   dustDetected
 }
+
+note bottom of SensorArray #FFCDD2
+[CHG-001] Right Sensor 제거: readRight(),
+RightSensor, rightObstacle 삭제.
+장애물 감지는 Front + Left 센서만 사용.
+end note
 
 class ObstacleAvoidancePolicy {
   selectDirection(reading)
@@ -91,7 +97,7 @@ User --> RvcController : presses button
 RvcController --> SensorArray : reads
 SensorArray o-- FrontSensor
 SensorArray o-- LeftSensor
-SensorArray o-- RightSensor
+' [CHG-001] deleted: SensorArray o-- RightSensor
 SensorArray o-- DustSensor
 SensorArray --> SensorReading : produces
 RvcController --> ObstacleAvoidancePolicy : uses

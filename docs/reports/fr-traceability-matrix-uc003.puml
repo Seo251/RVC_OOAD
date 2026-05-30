@@ -13,12 +13,12 @@ left to right direction
 package "FR / Use Case" #DCEEFF {
   card "FR-006\nStart Avoidance" as FR006
   card "FR-007\nCleaner Off" as FR007
-  card "FR-008\nLeft First" as FR008
+  card "FR-008\nLeft Sensor" as FR008
   card "FR-009\nTurn Left" as FR009
-  card "FR-010\nCheck Right" as FR010
-  card "FR-011\nTurn Right" as FR011
-  card "FR-012\nBackward" as FR012
-  card "FR-013\nRetry Side" as FR013
+  card "FR-010\nLeft Blocked\n-> Turn Right" as FR010
+  card "FR-011\nFront Re-check\nafter Right Turn" as FR011
+  card "FR-012\nFront Clear\n-> Resume" as FR012
+  card "FR-013\nDead-end ->\nTurnLeft(restore)\n+ Backward" as FR013
   card "FR-014\nResume Clean" as FR014
   card "FR-017\nObstacle in\nPowerUp" as FR017
 }
@@ -54,9 +54,10 @@ FR007 --> OP1
 FR008 --> OP2
 FR009 --> OP2
 FR010 --> OP2
-FR011 --> OP2
-FR012 --> OP2
-FR013 --> OP2
+FR011 --> OP3
+FR011 --> OP4
+FR012 --> OP4
+FR013 --> OP1
 FR013 --> OP3
 FR014 --> OP3
 FR014 --> OP4

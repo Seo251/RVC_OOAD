@@ -112,7 +112,7 @@ makes the robot jump to a strange position when you press Power Button.
 - Right-click a cell: toggle dust.
 - `Power Button`: start (or stop) the autonomous cleaning loop.
 - `Front Clear` / `Front Obstacle`: manual sensor overrides for debugging.
-- `Left Clear` / `Right Clear` / `Both Blocked`: manual side-sensor overrides.
+- `Left Clear` / `Left Blocked`: manual left-sensor overrides (CHG-001: right sensor removed).
 - `Dust Detected`: manually inject a dust detection event.
 - `Timer Expired`: manually fire the 3-second cleaner power-up timer.
 - `Motion Done`: manually confirm the current turn/backward motion.

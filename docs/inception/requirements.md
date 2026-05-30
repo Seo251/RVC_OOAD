@@ -15,12 +15,13 @@
 | FR-005 | 전방 장애물이 없으면 `rvc_controller`는 motor를 전진시키고 cleaner를 켜야 한다. |
 | FR-006 | 전방 장애물이 감지되면 `rvc_controller`는 장애물 회피 프로세스를 시작해야 한다. |
 | FR-007 | 장애물 회피 중에는 cleaner를 꺼야 한다. |
-| FR-008 | 장애물 회피 프로세스는 먼저 좌측 장애물 여부를 확인해야 한다. |
+<!-- [CHG-001] Right Sensor 제거: 회피는 Front + Left 센서만 사용 -->
+| FR-008 | 장애물 회피 프로세스는 <span style="color:#1565c0">좌측 센서로 좌측 장애물 여부를 확인해야 한다</span>. <span style="color:#c62828">~~먼저~~</span> (CHG-001: 우측 센서가 없으므로 측면 센서는 좌측 하나뿐이다.) |
 | FR-009 | 좌측 장애물이 없으면 `rvc_controller`는 motor에 좌회전 명령을 내려야 한다. |
-| FR-010 | 좌측 장애물이 있으면 `rvc_controller`는 우측 장애물 여부를 확인해야 한다. |
-| FR-011 | 우측 장애물이 없으면 `rvc_controller`는 motor에 우회전 명령을 내려야 한다. |
-| FR-012 | 좌측과 우측 모두 장애물이 있으면 `rvc_controller`는 좌측 또는 우측 중 하나가 비어 있을 때까지 motor에 후진 명령을 내려야 한다. |
-| FR-013 | 후진 중 좌측 또는 우측 중 하나가 비어 있으면 `rvc_controller`는 장애물이 없는 방향으로 회전해야 한다. |
+| FR-010 | <span style="color:#1565c0">좌측 장애물이 있으면 `rvc_controller`는 motor에 우회전 명령을 내려야 한다(우측 센서가 없으므로, 좌측이 막혔을 때 반대쪽인 우측으로 회피를 시도한다)</span>. <span style="color:#c62828">~~좌측 장애물이 있으면 우측 장애물 여부를 확인해야 한다.~~</span> (CHG-001) |
+| FR-011 | <span style="color:#1565c0">우회전이 완료되면 `rvc_controller`는 전방 장애물 여부를 다시 확인해야 한다(이때의 전방은 회전 전의 우측 방향이며, 전방 센서로 우측 가용 여부를 간접 판단한다)</span>. <span style="color:#c62828">~~우측 장애물이 없으면 motor에 우회전 명령을 내려야 한다.~~</span> (CHG-001) |
+| FR-012 | <span style="color:#1565c0">우회전 후 전방 장애물이 없으면(= 우측이 비어 있었던 경우) `rvc_controller`는 후진 없이 전진 청소로 복귀해야 한다</span>. <span style="color:#c62828">~~좌측과 우측 모두 장애물이 있으면 한쪽이 비어 있을 때까지 후진 명령을 내려야 한다.~~</span> (CHG-001) |
+| FR-013 | <span style="color:#1565c0">우회전 후에도 전방 장애물이 있으면(= 전방·좌측·우측이 모두 막힌 dead-end) `rvc_controller`는 우회전으로 이미 방향을 틀어 등진 좌측 장애물로 후진하지 않도록, 먼저 좌회전 명령으로 원래 진행 방향을 복원한 뒤 열린 뒤쪽으로 후진 명령을 내리고 회피 프로세스를 다시 시작해야 한다</span>. <span style="color:#c62828">~~후진 중 좌측 또는 우측 중 하나가 비어 있으면 장애물이 없는 방향으로 회전해야 한다.~~</span> (CHG-001, Option C) |
 | FR-014 | 장애물 회피 프로세스가 종료되면 `rvc_controller`는 다시 motor를 전진시키고 cleaner를 켜야 한다. |
 | FR-015 | 전진 중 전방 먼지가 감지되면 `rvc_controller`는 motor의 전진 동작을 멈추거나 지연시키지 않은 채 cleaner의 흡입력만 3초 동안 증가시켜야 한다. |
 | FR-016 | 흡입력 증가 후 3초가 지나면 `rvc_controller`는 cleaner의 흡입력을 정상화해야 하며, 이 변경은 motor의 전진 동작에 영향을 주지 않아야 한다. |
@@ -28,7 +29,7 @@
 | FR-021 | 흡입력 증가 중 다시 먼지가 감지되면 `rvc_controller`는 이전 타이머를 폐기하고 그 시점부터 다시 3초 타이머를 시작해야 한다. 이 재시작은 motor 동작에 영향을 주지 않는다. |
 | FR-018 | `rvc_controller`는 motor 명령을 `Forward`, `Backward`, `TurnLeft`, `TurnRight`, `Stop` 중 하나로 출력해야 한다. |
 | FR-019 | `rvc_controller`는 cleaner 명령을 `Off`, `On`, `PowerUp` 중 하나로 출력해야 한다. |
-| FR-020 | `rvc_controller`는 전방 센서, 좌측 센서, 우측 센서, 먼지 센서, 사용자 버튼 입력을 처리해야 한다. |
+| FR-020 | `rvc_controller`는 전방 센서, 좌측 센서, <span style="color:#c62828">~~우측 센서,~~</span> 먼지 센서, 사용자 버튼 입력을 처리해야 한다. <span style="color:#1565c0">(CHG-001: 우측 센서 입력 제거)</span> |
 
 ## Non-Functional Requirements
 
@@ -40,7 +41,7 @@
 | NFR-004 | 컨트롤러 로직은 하드웨어 상세 제어와 분리되어 단위 테스트가 가능해야 한다. |
 | NFR-005 | 모든 핵심 상태 전이는 GTest 기반 단위 테스트로 검증 가능해야 한다. |
 | NFR-006 | CI에서는 CMake build, GTest, Cppcheck, clang-tidy, SonarCloud 분석, coverage 수집이 자동으로 수행되어야 한다. |
-| NFR-007 | 회피 정책은 좌측 우선 정책을 기본으로 하되, 향후 정책 변경이 가능하도록 controller 내부 의사결정과 actuator 출력이 분리되어야 한다. |
+| NFR-007 | 회피 정책은 좌측 우선 정책을 기본으로 하되, 향후 정책 변경이 가능하도록 controller 내부 의사결정과 actuator 출력이 분리되어야 한다. <span style="color:#1565c0">(CHG-001/Option C: 측면 장애물 입력은 좌측 센서 하나만 사용한다. 좌측 차단 시 우회전 → 전방 재확인 순서로 회피하며, 후진은 우회전 후에도 전방이 막힌 dead-end에서만 사용하되 좌회전으로 원래 방향을 복원한 뒤 열린 뒤쪽으로 후진한다.)</span> |
 | NFR-008 | 전원 상태, 청소 상태, 회피 상태, 흡입력 증가 상태는 명확한 상태 모델로 표현되어야 한다. |
 | NFR-009 | 잘못된 센서 조합이나 반복 입력에도 controller는 정의되지 않은 motor/cleaner 명령을 출력하지 않아야 한다. |
 | NFR-010 | 본 Inception 범위에서는 모터 각도, 속도, 흡입력 세기 등 하드웨어 상세 파라미터를 결정하지 않는다. |
@@ -76,12 +77,12 @@
 | Field | Description |
 | --- | --- |
 | Primary Actor | Front Sensor |
-| Supporting Actors | Left Sensor, Right Sensor, Motor, Cleaner |
+| Supporting Actors | Left Sensor, <span style="color:#c62828">~~Right Sensor,~~</span> Motor, Cleaner <span style="color:#1565c0">(CHG-001: Right Sensor 제거)</span> |
 | Trigger | 전원이 켜져 있거나 청소 중일 때 전방 장애물이 감지된다. |
 | Preconditions | `rvc_controller` 전원이 켜져 있다. |
 | Postconditions | 장애물 회피 후 전진 청소 상태로 복귀한다. |
 | Main Success Scenario | 1. Front Sensor가 전방 장애물을 감지한다.<br>2. `rvc_controller`가 Cleaner에 `Off` 명령을 보낸다.<br>3. `rvc_controller`가 Left Sensor를 확인한다.<br>4. 좌측 장애물이 없다.<br>5. `rvc_controller`가 Motor에 `TurnLeft` 명령을 보낸다.<br>6. 회피가 종료된다.<br>7. `rvc_controller`가 Motor에 `Forward` 명령을 보낸다.<br>8. `rvc_controller`가 Cleaner에 `On` 명령을 보낸다. |
-| Extensions | 4a. 좌측 장애물이 있으면 Right Sensor를 확인한다.<br>4a1. 우측 장애물이 없으면 Motor에 `TurnRight` 명령을 보낸 뒤 전진 청소로 복귀한다.<br>4a2. 우측 장애물도 있으면 좌측 또는 우측 중 하나가 비어 있을 때까지 Motor에 `Backward` 명령을 보낸다.<br>4a3. 빈 방향이 감지되면 해당 방향으로 회전하고 전진 청소로 복귀한다. |
+| Extensions | <span style="color:#1565c0">4a. 좌측 장애물이 있으면 `rvc_controller`가 Motor에 `TurnRight` 명령을 보낸다(우측 센서가 없으므로 좌측의 반대쪽인 우측으로 회피 시도).<br>4a1. 우회전이 완료되면 Front Sensor로 전방을 다시 확인한다.<br>4a2. 전방이 비어 있으면(우측이 비어 있었던 경우) 후진 없이 Motor `Forward` + Cleaner `On`으로 복귀한다.<br>4a3. 전방이 여전히 막혀 있으면(전방·좌측·우측 모두 막힌 dead-end) 먼저 Motor에 `TurnLeft` 명령을 보내 원래 진행 방향을 복원한 뒤(우회전으로 등진 좌측 장애물로 후진하지 않기 위함), 열린 뒤쪽으로 `Backward` 명령을 보내고 회피를 다시 시작한다.</span><br><span style="color:#c62828">~~4a. 좌측 장애물이 있으면 Right Sensor를 확인한다. 4a1. 우측이 없으면 우회전. 4a2. 둘 다 막히면 후진. 4a3. 빈 방향으로 회전.~~</span> |
 
 ### UC-004 Power Up Cleaning On Dust
 

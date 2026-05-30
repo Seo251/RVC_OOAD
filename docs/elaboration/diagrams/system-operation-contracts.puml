@@ -4,9 +4,10 @@ title System Operations - RVC Controller Boundary
 left to right direction
 skinparam packageStyle rectangle
 
+' [CHG-001] Right Sensor 제거: Side Sensors -> Left Sensor, SideSensorUpdated(leftBlocked)
 actor User
 actor "Front Sensor" as FrontSensor
-actor "Side Sensors" as SideSensors
+actor "Left Sensor" as LeftSensor
 actor "Dust Sensor" as DustSensor
 actor Timer
 actor Motor
@@ -15,7 +16,7 @@ rectangle "rvc_controller boundary" {
   usecase "PressPowerButton()" as OpPower
   usecase "FrontObstacleDetected()" as OpFrontObstacle
   usecase "FrontPathClear()" as OpFrontClear
-  usecase "SideSensorUpdated(leftBlocked, rightBlocked)" as OpSide
+  usecase "SideSensorUpdated(leftBlocked)" as OpSide
   usecase "DustDetected()" as OpDust
   usecase "PowerUpTimerExpired()" as OpTimer
   usecase "MotionCompleted(motion)" as OpMotion
@@ -24,7 +25,7 @@ rectangle "rvc_controller boundary" {
 User --> OpPower
 FrontSensor --> OpFrontObstacle
 FrontSensor --> OpFrontClear
-SideSensors --> OpSide
+LeftSensor --> OpSide
 DustSensor --> OpDust
 Timer --> OpTimer
 Motor --> OpMotion
@@ -37,6 +38,10 @@ end note
 note bottom of OpFrontObstacle
 Higher priority than dust and timer.
 Enters obstacle avoidance immediately.
+Also re-checks front after the fallback
+right turn: still blocked => dead-end =>
+TurnLeft (restore heading) then Backward
+(avoids reversing into the left obstacle).
 end note
 
 note bottom of OpDust

@@ -3,9 +3,10 @@ title SSD - Obstacle Avoidance
 
 skinparam actorStyle awesome
 
+' [CHG-001] Right Sensor 제거: 측면 센서는 Left Sensor 하나만 사용
 box "External Actors"
 actor "Front Sensor" as FrontSensor
-actor "Side Sensors" as SideSensors
+actor "Left Sensor" as LeftSensor
 actor "Motor Completion" as MotorEvent
 actor Motor
 actor Cleaner
@@ -19,32 +20,33 @@ end box
 FrontSensor -> System: FrontObstacleDetected()
 System -> Timer: CancelPowerUpTimer()
 System -> Cleaner: TurnOff()
-System -> SideSensors: RequestSideCheck()
+System -> LeftSensor: RequestSideCheck()
 
 alt left side is clear
-  SideSensors -> System: SideSensorUpdated(false, rightBlocked)
+  LeftSensor -> System: SideSensorUpdated(false)
   System -> Motor: TurnLeft()
-else left blocked and right clear
-  SideSensors -> System: SideSensorUpdated(true, false)
+  MotorEvent -> System: MotionCompleted(TurnLeft)
+  System -> Motor: Forward()
+  System -> Cleaner: TurnOn()
+else left side is blocked
+  note over System #BBDEFB : (변경) 우측 센서가 없으므로 좌측이 막히면 먼저 우회전 시도
+  LeftSensor -> System: SideSensorUpdated(true)
   System -> Motor: TurnRight()
-else both sides are blocked
-  SideSensors -> System: SideSensorUpdated(true, true)
-  System -> Motor: Backward()
-  loop until left or right side is clear
+  MotorEvent -> System: MotionCompleted(TurnRight)
+  System -> FrontSensor: RequestFrontCheck()
+  alt front clear after right turn (right side was open)
+    note over System #C8E6C9 : (추가) 우측이 열려 있으면 후진 없이 복귀
+    FrontSensor -> System: FrontPathClear()
+    System -> Motor: Forward()
+    System -> Cleaner: TurnOn()
+  else front still blocked (front + left + right all blocked: dead-end)
+    note over System #BBDEFB : (변경) 진짜 dead-end. 등진 좌측 장애물로 후진하지 않도록\n먼저 좌회전으로 원래 방향 복원 후, 열린 뒤쪽으로 후진
+    FrontSensor -> System: FrontObstacleDetected()
+    System -> Motor: TurnLeft()
+    MotorEvent -> System: MotionCompleted(TurnLeft)
+    System -> Motor: Backward()
     MotorEvent -> System: MotionCompleted(Backward)
-    System -> SideSensors: RequestSideCheck()
-    SideSensors -> System: SideSensorUpdated(leftBlocked, rightBlocked)
-    alt left side becomes clear
-      System -> Motor: TurnLeft()
-    else right side becomes clear
-      System -> Motor: TurnRight()
-    else both still blocked
-      System -> Motor: Backward()
-    end
+    System -> LeftSensor: RequestSideCheck()
   end
 end
-
-MotorEvent -> System: MotionCompleted(TurnLeft or TurnRight)
-System -> Motor: Forward()
-System -> Cleaner: TurnOn()
 @enduml
